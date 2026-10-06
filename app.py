@@ -1,12 +1,4 @@
-"""
-app.py
-------
-API service: PDF văn bản -> OCR API -> LLM -> danh sách nhiệm vụ (JSON).
 
-Chạy:
-    uvicorn app:app --host 0.0.0.0 --port 8080
-Docs (Swagger): http://<host>:8080/docs
-"""
 
 import os
 import tempfile
@@ -23,12 +15,12 @@ app = FastAPI(title="Trích xuất nhiệm vụ", version="1.0.0")
 
 
 class Task(BaseModel):
-    ten_nhiem_vu: str = Field(description="Tên nhiệm vụ")
-    yeu_cau: str = Field(description="Yêu cầu cần hoàn thành")
-    don_vi_thuc_hien: str | None = Field(description="Đơn vị thực hiện (mỗi nhiệm vụ đúng 1 đơn vị)")
-    don_vi_phoi_hop: list[str] = Field(description="Các đơn vị phối hợp")
-    thoi_han: str | None = Field(description="Thời gian cần hoàn thành; null nếu văn bản không nêu")
-    can_cu: str | None = Field(description="Vị trí trong văn bản")
+    task_name: str = Field(description="Tên nhiệm vụ")
+    requirement: str = Field(description="Yêu cầu cần hoàn thành")
+    executing_unit: str | None = Field(description="Đơn vị thực hiện (mỗi nhiệm vụ đúng 1 đơn vị)")
+    coordinating_units: list[str] = Field(description="Các đơn vị phối hợp")
+    deadline: str | None = Field(description="Thời gian cần hoàn thành; null nếu văn bản không nêu")
+    reference: str | None = Field(description="Vị trí trong văn bản")
 
 
 class TextRequest(BaseModel):
@@ -50,7 +42,27 @@ def health():
 
 @app.post("/api/v1/tasks", response_model=list[Task])
 async def tasks_from_pdf(file: UploadFile = File(..., description="File PDF văn bản")):
-    """Upload PDF → OCR → trích xuất danh sách nhiệm vụ."""
+    """
+    Upload PDF → OCR → trích xuất danh sách nhiệm vụ.
+
+    **Input:** multipart/form-data, trường `file` là file PDF văn bản hành chính.
+
+    **Output:** mảng JSON, mỗi phần tử là một nhiệm vụ:
+
+    - `task_name` (string): tên ngắn gọn của nhiệm vụ (động từ + đối tượng),
+      vd "Thẩm định hồ sơ điều chỉnh cục bộ quy hoạch chung".
+    - `requirement` (string): yêu cầu cần hoàn thành — làm gì, về vấn đề gì, cho đối tượng nào,
+      sản phẩm/kết quả đầu ra; bám sát câu chữ văn bản.
+    - `executing_unit` (string | null): đơn vị thực hiện/chủ trì. Mỗi nhiệm vụ có đúng 1 đơn vị;
+      null nếu văn bản không xác định được.
+    - `coordinating_units` (string[]): các đơn vị phối hợp; [] nếu không có.
+      Khi văn bản nêu chung chung ("các cơ quan liên quan"...), đơn vị được suy luận từ knowledge base.
+    - `deadline` (string | null): thời gian cần hoàn thành, giữ nguyên cách ghi trong văn bản
+      (vd "Trong tháng 6 năm 2020"); null nếu văn bản không nêu.
+    - `reference` (string | null): vị trí trong văn bản, vd "Mục III, khoản 10".
+
+    **Lỗi:** 415 không phải PDF, 400 file rỗng, 502 lỗi OCR API / LLM (xem `detail`).
+    """
     if not (file.filename or "").lower().endswith(".pdf"):
         raise HTTPException(status_code=415, detail="Chỉ hỗ trợ file PDF.")
 
@@ -69,7 +81,3 @@ async def tasks_from_pdf(file: UploadFile = File(..., description="File PDF văn
     return await run_in_threadpool(_run, extract_tasks, text)
 
 
-@app.post("/api/v1/tasks/text", response_model=list[Task])
-def tasks_from_text(req: TextRequest):
-    """Trích xuất danh sách nhiệm vụ từ văn bản đã có sẵn (bỏ qua bước OCR)."""
-    return _run(extract_tasks, req.text, model=req.model)

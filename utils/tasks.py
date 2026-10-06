@@ -124,7 +124,10 @@ def _as_text(value) -> str | None:
 
 
 def normalize_tasks(items: list) -> list[dict]:
-    """Chuẩn hóa và tách nhiệm vụ: mỗi đơn vị thực hiện là một nhiệm vụ riêng."""
+    """Chuẩn hóa và tách nhiệm vụ: mỗi đơn vị thực hiện là một nhiệm vụ riêng.
+
+    LLM trả khóa tiếng Việt (theo prompt); output của API dùng khóa tiếng Anh.
+    """
     tasks = []
     for item in items:
         if not isinstance(item, dict):
@@ -133,12 +136,12 @@ def normalize_tasks(items: list) -> list[dict]:
         coordinators = _as_list(item.get("don_vi_phoi_hop"))
         for executor in executors or [None]:
             tasks.append({
-                "ten_nhiem_vu": _as_text(item.get("ten_nhiem_vu")) or "",
-                "yeu_cau": _as_text(item.get("yeu_cau")) or "",
-                "don_vi_thuc_hien": executor,
-                "don_vi_phoi_hop": [c for c in coordinators if c != executor],
-                "thoi_han": _as_text(item.get("thoi_han")),
-                "can_cu": _as_text(item.get("can_cu")),
+                "task_name": _as_text(item.get("ten_nhiem_vu")) or "",
+                "requirement": _as_text(item.get("yeu_cau")) or "",
+                "executing_unit": executor,
+                "coordinating_units": [c for c in coordinators if c != executor],
+                "deadline": _as_text(item.get("thoi_han")),
+                "reference": _as_text(item.get("can_cu")),
             })
     return tasks
 
