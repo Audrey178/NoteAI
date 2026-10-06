@@ -21,11 +21,14 @@ lượt 2 dùng KB để xác định đơn vị cho các chủ thể chung chun
 
 ```
 .
-├── pdf_pipeline.py      # Entry point: OCR -> giao việc, lưu kết quả vào results/
+├── pdf_pipeline.py      # Entry point CLI: OCR -> giao việc, lưu kết quả vào results/
+├── app.py               # API service (FastAPI): PDF -> danh sách nhiệm vụ JSON
+├── Dockerfile           # Đóng gói API service
 ├── knowledge_base.json  # Phạm vi phụ trách của các cơ quan (dùng để suy luận nhiệm vụ gián tiếp)
 ├── utils/
 │   ├── ocr_client.py    # Gọi OCR API, đọc JSON OCR có sẵn, trích text
 │   ├── assignments.py   # Prompt + 2 lượt trích xuất giao việc
+│   ├── tasks.py         # Prompt + chuẩn hóa/tách nhiệm vụ dạng JSON (dùng cho API)
 │   ├── knowledge_base.py# Đọc KB, chuyển sang dạng đưa vào prompt
 │   └── llm.py           # Gọi endpoint /chat/completions
 ├── requirements.txt
@@ -90,6 +93,71 @@ Với file đầu vào `<tên>.pdf`, pipeline ghi vào thư mục `results/`:
 | `<tên>_giaoviec.md`   | Bảng giao việc Markdown                                   |
 
 Kết quả cũng được in ra terminal khi chạy xong.
+
+## API service
+
+Trả về **danh sách nhiệm vụ** dạng JSON. Mỗi nhiệm vụ gồm:
+
+| Trường | Ý nghĩa |
+|---|---|
+| `ten_nhiem_vu` | Tên nhiệm vụ |
+| `yeu_cau` | Yêu cầu cần hoàn thành |
+| `don_vi_thuc_hien` | Đơn vị thực hiện (đúng 1 đơn vị) |
+| `don_vi_phoi_hop` | Danh sách đơn vị phối hợp |
+| `thoi_han` | Thời gian cần hoàn thành (`null` nếu văn bản không nêu) |
+| `can_cu` | Vị trí trong văn bản |
+
+Quy tắc bóc tách:
+
+- Đơn vị A thực hiện, đơn vị B phối hợp → **01 nhiệm vụ** (A thực hiện, B phối hợp).
+- Đơn vị A và đơn vị B cùng thực hiện → **02 nhiệm vụ**, mỗi đơn vị thực hiện một nhiệm vụ
+  (việc tách được làm trong code, `utils/tasks.py::normalize_tasks`).
+- Cụm chung chung ("các cơ quan liên quan"...) được suy luận thành đơn vị cụ thể qua `knowledge_base.json`;
+  cụm không suy luận được sẽ bị loại khỏi danh sách đơn vị.
+
+### Chạy
+
+```bash
+pip install -r requirements.txt
+uvicorn app:app --host 0.0.0.0 --port 8080
+```
+
+Hoặc Docker:
+
+```bash
+docker build -t noteai-api .
+docker run -d -p 8080:8080 --env-file .env noteai-api
+```
+
+Swagger UI: `http://<host>:8080/docs`
+
+### Endpoint
+
+| Method | Path | Input | Output |
+|---|---|---|---|
+| `GET` | `/health` | — | `{"status": "ok", "model": ...}` |
+| `POST` | `/api/v1/tasks` | multipart `file` (PDF) | `list[Task]` |
+| `POST` | `/api/v1/tasks/text` | JSON `{"text": "...", "model": "..."}` (bỏ qua OCR) | `list[Task]` |
+
+```bash
+curl -F "file=@Thông-báo-192-TB-VPCP.pdf" http://localhost:8080/api/v1/tasks
+```
+
+```json
+[
+  {
+    "ten_nhiem_vu": "Thẩm định hồ sơ điều chỉnh cục bộ quy hoạch chung xây dựng Thành phố",
+    "yeu_cau": "Tổ chức thẩm định hồ sơ điều chỉnh cục bộ quy hoạch chung xây dựng Thành phố Hồ Chí Minh ...",
+    "don_vi_thuc_hien": "Bộ Xây dựng",
+    "don_vi_phoi_hop": ["Ủy ban nhân dân Thành phố Hồ Chí Minh"],
+    "thoi_han": "Trong thời gian 10 ngày làm việc sau khi nhận được Hồ sơ",
+    "can_cu": "Mục III, khoản 10, 11"
+  }
+]
+```
+
+Mã lỗi: `415` không phải PDF, `400` file rỗng, `502` lỗi OCR API / LLM (kèm `detail`).
+Một request PDF gồm OCR (~85s cho 7 trang) + LLM nên cần đặt timeout ở reverse proxy/client đủ lớn (vd ≥ 15 phút).
 
 ## Dùng như thư viện
 
