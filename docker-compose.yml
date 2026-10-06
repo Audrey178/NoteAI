@@ -1,0 +1,18 @@
+services:
+  summarizer:
+    build: .
+    image: meeting-summarizer:latest
+    container_name: meeting-summarizer
+    env_file: .env
+    environment:
+      # Gọi vLLM qua tên container, cổng nội bộ 8000
+      OPENAI_BASE_URL: http://vsm-gemma4-26b-a4b-it:8000/v1
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    networks:
+      - llm-net
+
+networks:
+  llm-net:
+    external: true
