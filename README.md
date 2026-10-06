@@ -136,7 +136,7 @@ Swagger UI: `http://<host>:8080/docs`
 | Method | Path | Input | Output |
 |---|---|---|---|
 | `GET` | `/health` | — | `{"status": "ok", "model": ...}` |
-| `POST` | `/api/v1/tasks` | multipart `file` (PDF) | `list[Task]` |
+| `POST` | `/api/v1/tasks` | multipart `file` (PDF hoặc `.docx`) | `list[Task]` |
 
 ```bash
 curl -F "file=@Thông-báo-192-TB-VPCP.pdf" http://localhost:8080/api/v1/tasks
