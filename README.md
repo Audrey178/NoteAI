@@ -100,12 +100,12 @@ Trả về **danh sách nhiệm vụ** dạng JSON. Mỗi nhiệm vụ gồm:
 
 | Trường | Ý nghĩa |
 |---|---|
-| `ten_nhiem_vu` | Tên nhiệm vụ |
-| `yeu_cau` | Yêu cầu cần hoàn thành |
-| `don_vi_thuc_hien` | Đơn vị thực hiện (đúng 1 đơn vị) |
-| `don_vi_phoi_hop` | Danh sách đơn vị phối hợp |
-| `thoi_han` | Thời gian cần hoàn thành (`null` nếu văn bản không nêu) |
-| `can_cu` | Vị trí trong văn bản |
+| `task_name` | Tên nhiệm vụ |
+| `requirement` | Yêu cầu cần hoàn thành |
+| `executing_unit` | Đơn vị thực hiện (đúng 1 đơn vị) |
+| `coordinating_units` | Danh sách đơn vị phối hợp |
+| `deadline` | Thời gian cần hoàn thành (`null` nếu văn bản không nêu) |
+| `reference` | Vị trí trong văn bản |
 
 Quy tắc bóc tách:
 
@@ -137,7 +137,6 @@ Swagger UI: `http://<host>:8080/docs`
 |---|---|---|---|
 | `GET` | `/health` | — | `{"status": "ok", "model": ...}` |
 | `POST` | `/api/v1/tasks` | multipart `file` (PDF) | `list[Task]` |
-| `POST` | `/api/v1/tasks/text` | JSON `{"text": "...", "model": "..."}` (bỏ qua OCR) | `list[Task]` |
 
 ```bash
 curl -F "file=@Thông-báo-192-TB-VPCP.pdf" http://localhost:8080/api/v1/tasks
@@ -146,12 +145,12 @@ curl -F "file=@Thông-báo-192-TB-VPCP.pdf" http://localhost:8080/api/v1/tasks
 ```json
 [
   {
-    "ten_nhiem_vu": "Thẩm định hồ sơ điều chỉnh cục bộ quy hoạch chung xây dựng Thành phố",
-    "yeu_cau": "Tổ chức thẩm định hồ sơ điều chỉnh cục bộ quy hoạch chung xây dựng Thành phố Hồ Chí Minh ...",
-    "don_vi_thuc_hien": "Bộ Xây dựng",
-    "don_vi_phoi_hop": ["Ủy ban nhân dân Thành phố Hồ Chí Minh"],
-    "thoi_han": "Trong thời gian 10 ngày làm việc sau khi nhận được Hồ sơ",
-    "can_cu": "Mục III, khoản 10, 11"
+    "task_name": "Thẩm định hồ sơ điều chỉnh cục bộ quy hoạch chung xây dựng Thành phố",
+    "requirement": "Tổ chức thẩm định hồ sơ điều chỉnh cục bộ quy hoạch chung xây dựng Thành phố Hồ Chí Minh ...",
+    "executing_unit": "Bộ Xây dựng",
+    "coordinating_units": ["Ủy ban nhân dân Thành phố Hồ Chí Minh"],
+    "deadline": "Trong thời gian 10 ngày làm việc sau khi nhận được Hồ sơ",
+    "reference": "Mục III, khoản 10, 11"
   }
 ]
 ```
