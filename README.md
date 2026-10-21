@@ -24,6 +24,8 @@ lượt 2 dùng KB để xác định đơn vị cho các chủ thể chung chun
 ├── pdf_pipeline.py      # Entry point CLI: OCR -> giao việc, lưu kết quả vào results/
 ├── app.py               # API service (FastAPI): PDF -> danh sách nhiệm vụ JSON
 ├── Dockerfile           # Đóng gói API service
+├── docker-compose.yml   # API + LLM self-host (llama.cpp) + OCR self-host (PaddleOCR-VL)
+├── ocr_service/         # OCR self-host: PaddleOCR-VL-1.6, giữ giao diện /v1/ocr/documents
 ├── knowledge_base.json  # Phạm vi phụ trách của các cơ quan (dùng để suy luận nhiệm vụ gián tiếp)
 ├── utils/
 │   ├── ocr_client.py    # Gọi OCR API, đọc JSON OCR có sẵn, trích text
@@ -122,7 +124,7 @@ pip install -r requirements.txt
 uvicorn app:app --host 0.0.0.0 --port 8080
 ```
 
-Hoặc Docker, gồm cả LLM self-host (xem mục dưới):
+Hoặc Docker, gồm cả LLM và OCR self-host (xem các mục dưới):
 
 ```bash
 docker compose up -d
@@ -148,6 +150,28 @@ Chọn model qua `LLM_HF_REPO` / `LLM_HF_FILE` trong `.env`:
 
 Bị lỗi hết VRAM (OOM) thì giảm `LLM_CTX_SIZE` (vd `24576`) hoặc chọn model nhỏ hơn.
 
+### OCR self-host (PaddleOCR-VL-1.6)
+
+Thay OCR API bên ngoài bằng 2 container:
+
+- `ocr-vl`: llama.cpp server chạy VLM **PaddleOCR-VL-1.6** (0.9B, `PaddlePaddle/PaddleOCR-VL-1.6-GGUF`) nhận dạng chữ.
+- `ocr`: pipeline PaddleOCR-VL (`ocr_service/`) — phân tích layout trên CPU, gửi từng vùng sang `ocr-vl`;
+  giữ nguyên giao diện `POST /v1/ocr/documents` -> `{"content": ...}` nên `utils/ocr_client.py` không đổi.
+
+Model OCR dòng chữ truyền thống của PaddleOCR (PP-OCRv5 latin / PP-OCRv6) **không có chữ tiếng Việt có dấu**
+(`Bộ` -> `B`, `Kết luận` -> `Kt lun`) nên không dùng.
+
+Chất lượng trên `Thông-báo-192-TB-VPCP.pdf` (8 trang), so với OCR API cũ (Surya + sửa chính tả bằng Gemma 26B):
+giống 99.2% theo ký tự, đủ 23 khoản, giữ đúng tên các Bộ/UBND; lỗi còn lại chủ yếu là sai dấu lẻ tẻ ("Phố" thay "Phó").
+
+Chế độ chạy VLM (`OCR_VL_GPU_LAYERS` / `OCR_VL_MMPROJ_OFFLOAD` trong `.env`), đo khi LLM đã chiếm ~6.3GB VRAM:
+
+| Chế độ | `OCR_VL_GPU_LAYERS` / `OCR_VL_MMPROJ_OFFLOAD` | 8 trang | VRAM thêm |
+|---|---|---|---|
+| Toàn CPU (mặc định) | `0` / `0` | ~291s | 0 |
+| Encoder ảnh trên GPU | `0` / `1` | ~126s | ~1.9GB (tổng ~8.1GB, sát trần 8GB) |
+| Toàn GPU | `99` / `1` | ~69s | ~2.8GB (cần GPU ≥ 10GB) |
+
 Swagger UI: `http://<host>:8080/docs`
 
 ### Endpoint
@@ -155,10 +179,10 @@ Swagger UI: `http://<host>:8080/docs`
 | Method | Path | Input | Output |
 |---|---|---|---|
 | `GET` | `/health` | — | `{"status": "ok", "model": ...}` |
-| `POST` | `/api/v1/tasks` | multipart `file` (PDF hoặc `.docx`) | `list[Task]` |
+| `POST` | `/v1/tasks` | multipart `file` (PDF hoặc `.docx`) | `list[Task]` |
 
 ```bash
-curl -F "file=@Thông-báo-192-TB-VPCP.pdf" http://localhost:8080/api/v1/tasks
+curl -F "file=@Thông-báo-192-TB-VPCP.pdf" http://localhost:8080/v1/tasks
 ```
 
 ```json

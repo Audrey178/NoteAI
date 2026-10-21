@@ -34,9 +34,11 @@ services:
       # trước khi kịp trả lời -> content rỗng. -1 = không giới hạn, 0 = tắt suy nghĩ.
       - --reasoning-budget
       - ${LLM_REASONING_BUDGET:-8192}
+    environment:
+      LLAMA_CACHE: /models             # không đặt thì llama.cpp tải vào ~/.cache/huggingface trong container (mất khi tạo lại)
     volumes:
       # Thư mục chứa file GGUF trên host (vd ~/scratch/models trên workspace Coder) — tải 1 lần, dùng lại
-      - ${LLM_MODELS_DIR:-./models}:/root/.cache/llama.cpp
+      - ${LLM_MODELS_DIR:-./models}:/models
     deploy:
       resources:
         reservations:
@@ -77,8 +79,9 @@ services:
       LLAMA_ARG_N_GPU_LAYERS: ${OCR_VL_GPU_LAYERS:-0}
       LLAMA_ARG_MMPROJ_OFFLOAD: ${OCR_VL_MMPROJ_OFFLOAD:-0}
       LLAMA_ARG_THREADS: ${OCR_VL_THREADS:-8}
+      LLAMA_CACHE: /models
     volumes:
-      - ${LLM_MODELS_DIR:-./models}:/root/.cache/llama.cpp
+      - ${LLM_MODELS_DIR:-./models}:/models
     deploy:
       resources:
         reservations:
