@@ -130,18 +130,23 @@ docker compose up -d
 
 ### LLM self-host (GPU 8GB VRAM)
 
-`docker-compose.yml` chạy kèm container `llm`: **llama.cpp server** với
-`google/gemma-4-26B-A4B-it-qat-q4_0-gguf` (bản QAT Q4_0 chính thức của Google, ~14.4GB).
+`docker-compose.yml` chạy kèm container `llm`: **llama.cpp server**, toàn bộ model nằm trên GPU
+nên không đòi hỏi nhiều RAM.
 
-- Attention + KV cache nằm trên GPU, các expert MoE nằm ở RAM CPU (`--n-cpu-moe`).
-  Model là MoE chỉ kích hoạt ~4B tham số/token nên vẫn chạy được tốc độ chấp nhận được.
-- Yêu cầu: GPU NVIDIA ≥ 8GB VRAM + `nvidia-container-toolkit`, **RAM ≥ 32GB**.
-- Lần chạy đầu tự tải weight về volume `llm-models` (mất một lúc); `summarizer` chờ `llm` healthy mới khởi động.
+- Yêu cầu: GPU NVIDIA ≥ 8GB VRAM + `nvidia-container-toolkit`.
+- Lần chạy đầu tự tải weight về `LLM_MODELS_DIR` (mặc định `./models`), các lần sau dùng lại;
+  `summarizer` chờ `llm` healthy mới khởi động.
 - Context mặc định 32k token, KV cache lượng tử hóa `q8_0`, xử lý 1 request mỗi lần (các request khác xếp hàng).
 
-Tinh chỉnh tốc độ: sau khi chạy, xem `nvidia-smi`; nếu VRAM còn dư thì giảm `LLM_N_CPU_MOE`
-trong `.env` (vd `99` → `20` → `15`...) để đưa bớt expert lên GPU, rồi `docker compose up -d llm`.
-Nếu bị lỗi hết VRAM (OOM) thì tăng lại hoặc giảm `LLM_CTX_SIZE`.
+Chọn model qua `LLM_HF_REPO` / `LLM_HF_FILE` trong `.env`:
+
+| Model | `LLM_HF_REPO` / `LLM_HF_FILE` | Weight | Ghi chú |
+|---|---|---|---|
+| Qwen3.5-9B Q4_K_M (mặc định) | `unsloth/Qwen3.5-9B-GGUF` / `Qwen3.5-9B-Q4_K_M.gguf` | 5.7GB | Vừa 8GB thoải mái với context 32k |
+| Gemma-4-12B QAT Q4_0 | `google/gemma-4-12B-it-qat-q4_0-gguf` / `gemma-4-12b-it-qat-q4_0.gguf` | 7.0GB | Cùng họ với model gốc nên prompt hợp hơn, nhưng rất sát 8GB — có thể phải giảm `LLM_CTX_SIZE` |
+| Gemma-4-E4B QAT Q4_0 | `google/gemma-4-E4B-it-qat-q4_0-gguf` / `gemma-4-E4B_q4_0-it.gguf` | 5.2GB | Nhẹ, nhưng khả năng suy luận đơn vị yếu hơn |
+
+Bị lỗi hết VRAM (OOM) thì giảm `LLM_CTX_SIZE` (vd `24576`) hoặc chọn model nhỏ hơn.
 
 Swagger UI: `http://<host>:8080/docs`
 

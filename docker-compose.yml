@@ -1,29 +1,25 @@
 services:
-  # LLM self-host: Gemma-4-26B-A4B (QAT Q4_0) trên llama.cpp, vừa GPU 8GB VRAM.
-  # Attention + KV cache nằm trên GPU, các expert MoE (~phần lớn 14GB weight) nằm ở RAM CPU
-  # => máy cần >= 32GB RAM. Mỗi token chỉ kích hoạt ~4B tham số nên vẫn đủ nhanh.
+  # LLM self-host trên llama.cpp, toàn bộ model nằm trên GPU 8GB VRAM (không cần nhiều RAM).
+  # Mặc định Qwen3.5-9B Q4_K_M (~5.7GB weight) để còn ~2GB cho KV cache 32k + buffer.
+  # Đổi model qua LLM_HF_REPO / LLM_HF_FILE trong .env (xem README).
   llm:
     image: ghcr.io/ggml-org/llama.cpp:server-cuda
     container_name: noteai-llm
     command:
       - --hf-repo
-      - google/gemma-4-26B-A4B-it-qat-q4_0-gguf
+      - ${LLM_HF_REPO:-unsloth/Qwen3.5-9B-GGUF}
       - --hf-file
-      - gemma-4-26B_q4_0-it.gguf
+      - ${LLM_HF_FILE:-Qwen3.5-9B-Q4_K_M.gguf}
       - --no-mmproj                    # chỉ dùng text, không tải vision projector
       - --alias
-      - google/gemma-4-26B-A4B-it      # giữ nguyên MODEL_NAME cũ
+      - ${MODEL_NAME:-local-llm}
       - --host
       - 0.0.0.0
       - --port
       - "8000"
-      - --jinja
+      - --jinja                        # dùng chat template của model; phần "thinking" tách ra reasoning_content
       - --n-gpu-layers
       - "999"
-      # Số layer để expert ở CPU. Bắt đầu với tất cả, rồi giảm dần đến khi gần đầy VRAM
-      # (xem nvidia-smi) — càng nhiều expert trên GPU càng nhanh.
-      - --n-cpu-moe
-      - ${LLM_N_CPU_MOE:-99}
       - --ctx-size
       - ${LLM_CTX_SIZE:-32768}         # văn bản ~10k token + KB ~5k + prompt + output
       - --flash-attn
@@ -35,7 +31,8 @@ services:
       - --parallel
       - "1"                            # 8GB chỉ đủ KV cache cho 1 request, các request khác xếp hàng
     volumes:
-      - llm-models:/root/.cache/llama.cpp
+      # Thư mục chứa file GGUF trên host (vd ~/scratch/models trên workspace Coder) — tải 1 lần, dùng lại
+      - ${LLM_MODELS_DIR:-./models}:/root/.cache/llama.cpp
     deploy:
       resources:
         reservations:
@@ -48,7 +45,7 @@ services:
       interval: 30s
       timeout: 5s
       retries: 5
-      start_period: 30m                # lần đầu phải tải ~14GB weight
+      start_period: 20m                # lần đầu phải tải weight (~6GB)
     restart: unless-stopped
 
   summarizer:
@@ -64,6 +61,3 @@ services:
       llm:
         condition: service_healthy
     restart: unless-stopped
-
-volumes:
-  llm-models:
