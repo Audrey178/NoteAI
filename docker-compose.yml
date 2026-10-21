@@ -1,7 +1,4 @@
 services:
-  # LLM self-host trên llama.cpp, toàn bộ model nằm trên GPU 8GB VRAM (không cần nhiều RAM).
-  # Mặc định Qwen3.5-9B Q4_K_M (~5.7GB weight) để còn ~2GB cho KV cache 32k + buffer.
-  # Đổi model qua LLM_HF_REPO / LLM_HF_FILE trong .env (xem README).
   llm:
     image: ghcr.io/ggml-org/llama.cpp:server-cuda
     container_name: noteai-llm
@@ -10,18 +7,18 @@ services:
       - ${LLM_HF_REPO:-unsloth/Qwen3.5-9B-GGUF}
       - --hf-file
       - ${LLM_HF_FILE:-Qwen3.5-9B-Q4_K_M.gguf}
-      - --no-mmproj                    # chỉ dùng text, không tải vision projector
+      - --no-mmproj # chỉ dùng text, không tải vision projector
       - --alias
       - ${MODEL_NAME:-local-llm}
       - --host
       - 0.0.0.0
       - --port
       - "8000"
-      - --jinja                        # dùng chat template của model; phần "thinking" tách ra reasoning_content
+      - --jinja # dùng chat template của model; phần "thinking" tách ra reasoning_content
       - --n-gpu-layers
       - "999"
       - --ctx-size
-      - ${LLM_CTX_SIZE:-32768}         # văn bản ~10k token + KB ~5k + prompt + output
+      - ${LLM_CTX_SIZE:-32768} # văn bản ~10k token + KB ~5k + prompt + output
       - --flash-attn
       - "on"
       - --cache-type-k
@@ -29,13 +26,13 @@ services:
       - --cache-type-v
       - q8_0
       - --parallel
-      - "1"                            # 8GB chỉ đủ KV cache cho 1 request, các request khác xếp hàng
+      - "1" # 8GB chỉ đủ KV cache cho 1 request, các request khác xếp hàng
       # Giới hạn token "suy nghĩ" (Qwen3.5): không giới hạn thì có thể ăn hết context 32k
       # trước khi kịp trả lời -> content rỗng. -1 = không giới hạn, 0 = tắt suy nghĩ.
       - --reasoning-budget
       - ${LLM_REASONING_BUDGET:-8192}
     environment:
-      LLAMA_CACHE: /models             # không đặt thì llama.cpp tải vào ~/.cache/huggingface trong container (mất khi tạo lại)
+      LLAMA_CACHE: /models # không đặt thì llama.cpp tải vào ~/.cache/huggingface trong container (mất khi tạo lại)
     volumes:
       # Thư mục chứa file GGUF trên host (vd ~/scratch/models trên workspace Coder) — tải 1 lần, dùng lại
       - ${LLM_MODELS_DIR:-./models}:/models
@@ -51,19 +48,14 @@ services:
       interval: 30s
       timeout: 5s
       retries: 5
-      start_period: 20m                # lần đầu phải tải weight (~6GB)
+      start_period: 20m # lần đầu phải tải weight (~6GB)
     restart: unless-stopped
-
-  # VLM nhận dạng chữ cho OCR: PaddleOCR-VL-1.6 (0.9B) trên llama.cpp bản CPU,
-  # để dành trọn GPU 8GB cho llm (llm ~6.3GB + VLM trên GPU ~2.8GB sẽ vượt 8GB).
-  # Đo trên PDF 8 trang: CPU 8 luồng ~291s; nếu GPU còn >= 3GB trống có thể đổi sang image server-cuda
-  # + thêm reservation GPU như service llm (~69s).
   ocr-vl:
     image: ghcr.io/ggml-org/llama.cpp:server
     container_name: noteai-ocr-vl
     command:
       - --hf-repo
-      - PaddlePaddle/PaddleOCR-VL-1.6-GGUF   # tự tải kèm file mmproj (vision encoder)
+      - PaddlePaddle/PaddleOCR-VL-1.6-GGUF
       - --host
       - 0.0.0.0
       - --port
@@ -71,7 +63,7 @@ services:
       - --temp
       - "0"
       - --ctx-size
-      - "16384"                        # mặc định 131k x 4 slot rất tốn bộ nhớ; mỗi vùng ảnh chỉ cần vài nghìn token
+      - "16384" # mặc định 131k x 4 slot rất tốn bộ nhớ; mỗi vùng ảnh chỉ cần vài nghìn token
       - --parallel
       - "2"
       - --threads
@@ -103,7 +95,13 @@ services:
       ocr-vl:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import json,urllib.request;assert json.load(urllib.request.urlopen('http://localhost:8000/health'))['status']=='ok'"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import json,urllib.request;assert json.load(urllib.request.urlopen('http://localhost:8000/health'))['status']=='ok'",
+        ]
       interval: 30s
       timeout: 5s
       retries: 5
