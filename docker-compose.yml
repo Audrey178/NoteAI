@@ -1,18 +1,69 @@
 services:
+  # LLM self-host: Gemma-4-26B-A4B (QAT Q4_0) trên llama.cpp, vừa GPU 8GB VRAM.
+  # Attention + KV cache nằm trên GPU, các expert MoE (~phần lớn 14GB weight) nằm ở RAM CPU
+  # => máy cần >= 32GB RAM. Mỗi token chỉ kích hoạt ~4B tham số nên vẫn đủ nhanh.
+  llm:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    container_name: noteai-llm
+    command:
+      - --hf-repo
+      - google/gemma-4-26B-A4B-it-qat-q4_0-gguf
+      - --hf-file
+      - gemma-4-26B_q4_0-it.gguf
+      - --no-mmproj                    # chỉ dùng text, không tải vision projector
+      - --alias
+      - google/gemma-4-26B-A4B-it      # giữ nguyên MODEL_NAME cũ
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --jinja
+      - --n-gpu-layers
+      - "999"
+      # Số layer để expert ở CPU. Bắt đầu với tất cả, rồi giảm dần đến khi gần đầy VRAM
+      # (xem nvidia-smi) — càng nhiều expert trên GPU càng nhanh.
+      - --n-cpu-moe
+      - ${LLM_N_CPU_MOE:-99}
+      - --ctx-size
+      - ${LLM_CTX_SIZE:-32768}         # văn bản ~10k token + KB ~5k + prompt + output
+      - --flash-attn
+      - "on"
+      - --cache-type-k
+      - q8_0
+      - --cache-type-v
+      - q8_0
+      - --parallel
+      - "1"                            # 8GB chỉ đủ KV cache cho 1 request, các request khác xếp hàng
+    volumes:
+      - llm-models:/root/.cache/llama.cpp
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30m                # lần đầu phải tải ~14GB weight
+    restart: unless-stopped
+
   summarizer:
     build: .
     image: meeting-summarizer:latest
     container_name: meeting-summarizer
     env_file: .env
     environment:
-      # Gọi vLLM qua tên container, cổng nội bộ 8000
-      OPENAI_BASE_URL: http://vsm-gemma4-26b-a4b-it:8000/v1
+      OPENAI_BASE_URL: http://llm:8000/v1
     ports:
       - "8080:8080"
+    depends_on:
+      llm:
+        condition: service_healthy
     restart: unless-stopped
-    networks:
-      - llm-net
 
-networks:
-  llm-net:
-    external: true
+volumes:
+  llm-models:

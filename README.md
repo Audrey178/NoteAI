@@ -122,12 +122,26 @@ pip install -r requirements.txt
 uvicorn app:app --host 0.0.0.0 --port 8080
 ```
 
-Hoặc Docker:
+Hoặc Docker, gồm cả LLM self-host (xem mục dưới):
 
 ```bash
-docker build -t noteai-api .
-docker run -d -p 8080:8080 --env-file .env noteai-api
+docker compose up -d
 ```
+
+### LLM self-host (GPU 8GB VRAM)
+
+`docker-compose.yml` chạy kèm container `llm`: **llama.cpp server** với
+`google/gemma-4-26B-A4B-it-qat-q4_0-gguf` (bản QAT Q4_0 chính thức của Google, ~14.4GB).
+
+- Attention + KV cache nằm trên GPU, các expert MoE nằm ở RAM CPU (`--n-cpu-moe`).
+  Model là MoE chỉ kích hoạt ~4B tham số/token nên vẫn chạy được tốc độ chấp nhận được.
+- Yêu cầu: GPU NVIDIA ≥ 8GB VRAM + `nvidia-container-toolkit`, **RAM ≥ 32GB**.
+- Lần chạy đầu tự tải weight về volume `llm-models` (mất một lúc); `summarizer` chờ `llm` healthy mới khởi động.
+- Context mặc định 32k token, KV cache lượng tử hóa `q8_0`, xử lý 1 request mỗi lần (các request khác xếp hàng).
+
+Tinh chỉnh tốc độ: sau khi chạy, xem `nvidia-smi`; nếu VRAM còn dư thì giảm `LLM_N_CPU_MOE`
+trong `.env` (vd `99` → `20` → `15`...) để đưa bớt expert lên GPU, rồi `docker compose up -d llm`.
+Nếu bị lỗi hết VRAM (OOM) thì tăng lại hoặc giảm `LLM_CTX_SIZE`.
 
 Swagger UI: `http://<host>:8080/docs`
 
