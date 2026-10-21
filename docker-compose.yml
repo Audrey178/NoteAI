@@ -30,6 +30,10 @@ services:
       - q8_0
       - --parallel
       - "1"                            # 8GB chỉ đủ KV cache cho 1 request, các request khác xếp hàng
+      # Giới hạn token "suy nghĩ" (Qwen3.5): không giới hạn thì có thể ăn hết context 32k
+      # trước khi kịp trả lời -> content rỗng. -1 = không giới hạn, 0 = tắt suy nghĩ.
+      - --reasoning-budget
+      - ${LLM_REASONING_BUDGET:-8192}
     volumes:
       # Thư mục chứa file GGUF trên host (vd ~/scratch/models trên workspace Coder) — tải 1 lần, dùng lại
       - ${LLM_MODELS_DIR:-./models}:/root/.cache/llama.cpp
