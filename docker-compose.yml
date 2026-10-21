@@ -56,7 +56,7 @@ services:
     environment:
       OPENAI_BASE_URL: http://llm:8000/v1
     ports:
-      - "8080:8080"
+      - "${API_PORT:-8080}:8080"
     depends_on:
       llm:
         condition: service_healthy
