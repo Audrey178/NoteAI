@@ -52,6 +52,70 @@ services:
       start_period: 20m                # lần đầu phải tải weight (~6GB)
     restart: unless-stopped
 
+  # VLM nhận dạng chữ cho OCR: PaddleOCR-VL-1.6 (0.9B) trên llama.cpp, dùng chung GPU với llm.
+  ocr-vl:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    container_name: noteai-ocr-vl
+    command:
+      - --hf-repo
+      - PaddlePaddle/PaddleOCR-VL-1.6-GGUF   # tự tải kèm file mmproj (vision encoder)
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --temp
+      - "0"
+      - --ctx-size
+      - "16384"                        # mặc định 131k x 4 slot tốn ~4.7GB VRAM; mỗi vùng ảnh chỉ cần vài nghìn token
+      - --parallel
+      - "2"
+    environment:
+      # Đo trên PDF 8 trang (LLM chiếm sẵn ~6.3GB VRAM):
+      #   GPU_LAYERS=0,  MMPROJ_OFFLOAD=0 -> 291s, 0GB VRAM      (mặc định, chắc chắn vừa GPU 8GB)
+      #   GPU_LAYERS=0,  MMPROJ_OFFLOAD=1 -> 126s, ~1.9GB VRAM   (tổng ~8.1GB, sát trần)
+      #   GPU_LAYERS=99, MMPROJ_OFFLOAD=1 ->  69s, ~2.8GB VRAM   (cần GPU >= 10GB)
+      LLAMA_ARG_N_GPU_LAYERS: ${OCR_VL_GPU_LAYERS:-0}
+      LLAMA_ARG_MMPROJ_OFFLOAD: ${OCR_VL_MMPROJ_OFFLOAD:-0}
+      LLAMA_ARG_THREADS: ${OCR_VL_THREADS:-8}
+    volumes:
+      - ${LLM_MODELS_DIR:-./models}:/root/.cache/llama.cpp
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10m
+    restart: unless-stopped
+
+  # OCR self-host: PaddleOCR-VL pipeline (layout chạy CPU, nhận dạng gọi sang ocr-vl).
+  # Giữ giao diện POST /v1/ocr/documents -> {"content": ...} của OCR API cũ.
+  ocr:
+    build: ./ocr_service
+    image: noteai-ocr:latest
+    container_name: noteai-ocr
+    environment:
+      OCR_VL_SERVER_URL: http://ocr-vl:8000/v1
+    volumes:
+      # Weight model layout của PaddleOCR, tải lần đầu khi khởi động
+      - ${OCR_MODELS_DIR:-./models/paddlex}:/models
+    depends_on:
+      ocr-vl:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import json,urllib.request;assert json.load(urllib.request.urlopen('http://localhost:8000/health'))['status']=='ok'"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10m
+    restart: unless-stopped
+
   summarizer:
     build: .
     image: meeting-summarizer:latest
@@ -59,9 +123,12 @@ services:
     env_file: .env
     environment:
       OPENAI_BASE_URL: http://llm:8000/v1
+      OCR_ENDPOINT: http://ocr:8000/v1/ocr/documents
     ports:
       - "${API_PORT:-8080}:8080"
     depends_on:
       llm:
+        condition: service_healthy
+      ocr:
         condition: service_healthy
     restart: unless-stopped
