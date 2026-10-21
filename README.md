@@ -114,24 +114,14 @@ Kết quả cũng được in ra terminal khi chạy xong.
 
 ## API service
 
-Trả về **danh sách nhiệm vụ** dạng JSON. Mỗi nhiệm vụ gồm:
+API (FastAPI) nhận file văn bản hành chính và trả về **danh sách nhiệm vụ** dạng JSON:
+đơn vị nào thực hiện, đơn vị nào phối hợp, yêu cầu gì, thời hạn nào, căn cứ ở đâu trong văn bản.
 
-| Trường | Ý nghĩa |
-|---|---|
-| `task_name` | Tên nhiệm vụ |
-| `requirement` | Yêu cầu cần hoàn thành |
-| `executing_unit` | Đơn vị thực hiện (đúng 1 đơn vị) |
-| `coordinating_units` | Danh sách đơn vị phối hợp |
-| `deadline` | Thời gian cần hoàn thành (`null` nếu văn bản không nêu) |
-| `reference` | Vị trí trong văn bản |
-
-Quy tắc bóc tách:
-
-- Đơn vị A thực hiện, đơn vị B phối hợp → **01 nhiệm vụ** (A thực hiện, B phối hợp).
-- Đơn vị A và đơn vị B cùng thực hiện → **02 nhiệm vụ**, mỗi đơn vị thực hiện một nhiệm vụ
-  (việc tách được làm trong code, `utils/tasks.py::normalize_tasks`).
-- Cụm chung chung ("các cơ quan liên quan"...) được suy luận thành đơn vị cụ thể qua `knowledge_base.json`;
-  cụm không suy luận được sẽ bị loại khỏi danh sách đơn vị.
+```
+PDF  ──► OCR ──┐
+               ├──► văn bản ──► LLM + knowledge base ──► list[Task]
+.docx ─────────┘   (đọc trực tiếp, không qua OCR)
+```
 
 ### Chạy
 
@@ -143,6 +133,105 @@ uvicorn app:app --host 0.0.0.0 --port 8080
 Hoặc Docker, gồm cả LLM và OCR self-host (xem mục [Docker compose](#docker-compose-self-host)).
 
 Swagger UI: `http://<host>:8080/docs`
+
+### Endpoint
+
+| Method | Path | Input | Output |
+|---|---|---|---|
+| `GET` | `/health` | — | `{"status": "ok", "model": "<tên model LLM>"}` |
+| `POST` | `/v1/tasks` | multipart `file` (PDF hoặc `.docx`) | `list[Task]` |
+
+`/health` chỉ cho biết API đang chạy, không kiểm tra OCR / LLM phía sau.
+
+### `POST /v1/tasks`
+
+Đầu vào: `multipart/form-data`, trường `file`.
+
+| Định dạng | Cách lấy nội dung |
+|---|---|
+| `.pdf` | Gửi sang dịch vụ OCR (`OCR_ENDPOINT`), hỗ trợ PDF scan |
+| `.docx` | Đọc trực tiếp đoạn văn + bảng, không qua OCR (nhanh hơn) |
+| `.doc` | Không hỗ trợ — lưu lại thành `.docx` |
+
+```bash
+curl -m 1200 -F "file=@Thông-báo-192-TB-VPCP.pdf" http://localhost:8080/v1/tasks
+```
+
+Đầu ra: mảng JSON, mỗi phần tử là một `Task`:
+
+| Trường | Kiểu | Ý nghĩa |
+|---|---|---|
+| `task_name` | string | Tên ngắn gọn của nhiệm vụ (động từ + đối tượng) |
+| `requirement` | string | Yêu cầu cần hoàn thành: làm gì, về vấn đề gì, sản phẩm đầu ra; bám sát câu chữ văn bản |
+| `executing_unit` | string \| null | Đơn vị thực hiện / chủ trì — đúng 1 đơn vị; `null` nếu không xác định được |
+| `coordinating_units` | string[] | Các đơn vị phối hợp; `[]` nếu không có |
+| `deadline` | string \| null | Thời hạn, giữ nguyên cách ghi trong văn bản; `null` nếu văn bản không nêu |
+| `reference` | string \| null | Vị trí trong văn bản (mục, khoản) |
+
+```json
+[
+  {
+    "task_name": "Thẩm định hồ sơ điều chỉnh cục bộ quy hoạch chung xây dựng",
+    "requirement": "Tổ chức thẩm định hồ sơ điều chỉnh cục bộ quy hoạch chung xây dựng Thành phố Hồ Chí Minh, trình Thủ tướng Chính phủ xem xét, quyết định.",
+    "executing_unit": "Bộ Xây dựng",
+    "coordinating_units": [],
+    "deadline": "Trong thời gian 10 ngày làm việc sau khi nhận được Hồ sơ",
+    "reference": "Mục III, khoản 10"
+  }
+]
+```
+
+Quy tắc bóc tách:
+
+- Đơn vị A thực hiện, đơn vị B phối hợp → **01 nhiệm vụ** (`executing_unit = A`, `coordinating_units = [B]`).
+- Đơn vị A và đơn vị B cùng thực hiện → **02 nhiệm vụ**, mỗi đơn vị thực hiện một nhiệm vụ
+  (việc tách được làm trong code, `utils/tasks.py::normalize_tasks`).
+- Cụm chung chung ("các cơ quan liên quan", "các Bộ, ngành"...) được suy luận thành đơn vị cụ thể qua
+  `knowledge_base.json`; cụm không suy luận được sẽ bị loại khỏi danh sách đơn vị.
+
+Mã lỗi (body dạng `{"detail": "..."}`):
+
+| Mã | Khi nào | Ví dụ `detail` |
+|---|---|---|
+| `400` | File rỗng, `.docx` hỏng, hoặc không trích xuất được nội dung | `File rỗng.` |
+| `415` | Không phải `.pdf` / `.docx` | `Chỉ hỗ trợ file PDF hoặc Word (.docx).` |
+| `422` | Thiếu trường `file` | — |
+| `502` | Lỗi từ dịch vụ OCR hoặc LLM phía sau | `Không đọc được JSON từ LLM: ...` |
+
+Thời gian xử lý: request chạy **đồng bộ**, trả kết quả khi xong.
+
+| Đầu vào (văn bản 8 trang) | Thời gian tham khảo |
+|---|---|
+| `.docx` | ~1.5–3 phút (chỉ LLM) |
+| PDF | ~3–8 phút (OCR self-host chạy CPU + LLM) |
+
+LLM xử lý 1 request mỗi lần, request đến sau phải xếp hàng → đặt timeout ở client / reverse proxy đủ lớn
+(khuyến nghị ≥ 15 phút).
+
+Kết quả do LLM sinh ra nên cần **người rà soát** trước khi dùng chính thức: có thể sót nhiệm vụ,
+gán nhầm vai trò phối hợp, hoặc tên đơn vị chưa chuẩn hóa.
+
+### OCR service (`ocr_service/`)
+
+Dịch vụ OCR self-host, dùng nội bộ trong `docker compose` (không publish cổng ra ngoài):
+
+| Method | Path | Input | Output |
+|---|---|---|---|
+| `GET` | `/health` | — | `{"status": "ok" \| "loading", "vl_server": ...}` |
+| `POST` | `/v1/ocr/documents` | multipart `file` (PDF hoặc ảnh png/jpg/bmp/tif) | JSON, trường `content` là văn bản Markdown |
+
+```json
+{
+  "schema_version": "1.0.0",
+  "document": {"filename": "a.pdf", "page_count": 8},
+  "content": "THÔNG BÁO\n\nKết luận của Thủ tướng Chính phủ ...",
+  "processing": {"ocr_engine": "paddleocr-vl-1.6", "duration_ms": 315535}
+}
+```
+
+Giao diện tương thích với OCR API cũ mà `utils/ocr_client.py` gọi: các form field `rasterize`,
+`enable_correction`, `process_table`, `use_celery`, `use_cache` được chấp nhận nhưng bỏ qua; ảnh / con dấu
+trong Markdown được lọc bỏ. Mã lỗi: `415` định dạng không hỗ trợ, `400` file rỗng, `500` lỗi OCR.
 
 ## Docker compose (self-host)
 
@@ -255,34 +344,6 @@ docker compose down                           # model trong LLM_MODELS_DIR / OCR
 ```
 
 Mở Swagger UI của server từ máy cá nhân: `ssh -L 8080:localhost:8080 <server>` rồi vào `http://localhost:8080/docs`.
-
-### Endpoint
-
-| Method | Path | Input | Output |
-|---|---|---|---|
-| `GET` | `/health` | — | `{"status": "ok", "model": ...}` |
-| `POST` | `/v1/tasks` | multipart `file` (PDF hoặc `.docx`) | `list[Task]` |
-
-```bash
-curl -F "file=@Thông-báo-192-TB-VPCP.pdf" http://localhost:8080/v1/tasks
-```
-
-```json
-[
-  {
-    "task_name": "Thẩm định hồ sơ điều chỉnh cục bộ quy hoạch chung xây dựng Thành phố",
-    "requirement": "Tổ chức thẩm định hồ sơ điều chỉnh cục bộ quy hoạch chung xây dựng Thành phố Hồ Chí Minh ...",
-    "executing_unit": "Bộ Xây dựng",
-    "coordinating_units": ["Ủy ban nhân dân Thành phố Hồ Chí Minh"],
-    "deadline": "Trong thời gian 10 ngày làm việc sau khi nhận được Hồ sơ",
-    "reference": "Mục III, khoản 10, 11"
-  }
-]
-```
-
-Mã lỗi: `415` không phải PDF, `400` file rỗng, `502` lỗi OCR API / LLM (kèm `detail`).
-Một request PDF gồm OCR (~5 phút cho 8 trang khi OCR self-host chạy CPU) + LLM (~3 phút) nên cần đặt timeout
-ở reverse proxy/client đủ lớn (vd ≥ 15 phút). LLM xử lý 1 request mỗi lần, request đến sau phải xếp hàng.
 
 ## Dùng như thư viện
 
