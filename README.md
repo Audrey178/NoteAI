@@ -54,39 +54,39 @@ cp .env.example .env
 
 Sau đó chỉnh `.env`. Có 2 cách chạy, dùng các biến khác nhau:
 
-| Cách chạy | OCR / LLM lấy ở đâu | Biến cần quan tâm |
-|---|---|---|
-| **`docker compose`** (self-host, khuyến nghị) | Container `ocr` / `llm` trong cùng compose — compose tự đặt `OCR_ENDPOINT` / `OPENAI_BASE_URL` | Bảng 2 (thư mục model, model LLM, context...) |
-| **Chạy trực tiếp** (`pdf_pipeline.py`, `uvicorn app:app`) | Dịch vụ bất kỳ có URL truy cập được | Bảng 1, đặc biệt `OCR_ENDPOINT` / `OPENAI_BASE_URL` |
+| Cách chạy                                                 | OCR / LLM lấy ở đâu                                                                            | Biến cần quan tâm                                   |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| **`docker compose`** (self-host, khuyến nghị)             | Container `ocr` / `llm` trong cùng compose — compose tự đặt `OCR_ENDPOINT` / `OPENAI_BASE_URL` | Bảng 2 (thư mục model, model LLM, context...)       |
+| **Chạy trực tiếp** (`pdf_pipeline.py`, `uvicorn app:app`) | Dịch vụ bất kỳ có URL truy cập được                                                            | Bảng 1, đặc biệt `OCR_ENDPOINT` / `OPENAI_BASE_URL` |
 
 **Bảng 1 — biến của app** (đọc trong `utils/`, `app.py`):
 
-| Biến              | Ý nghĩa                                              | Mặc định trong code           |
-|-------------------|------------------------------------------------------|-------------------------------|
-| `OCR_ENDPOINT`    | URL OCR API (`.../v1/ocr/documents`)                 | — (bắt buộc khi OCR file PDF) |
-| `OCR_TIMEOUT`     | Thời gian chờ OCR tối đa (giây)                      | `900`                         |
-| `OPENAI_BASE_URL` | Base URL của server LLM tương thích OpenAI           | `http://localhost:8000/v1`    |
-| `MODEL_NAME`      | Tên model trên server (compose: cũng là alias của llama.cpp) | `google/gemma-4-26B-A4B-it`, `.env.example`: `local-llm` |
-| `OPENAI_API_KEY`  | API key (để trống nếu server không yêu cầu)          | `EMPTY`                       |
-| `LLM_TEMPERATURE` | Temperature khi gọi LLM                              | `0`                           |
-| `LLM_MAX_RETRIES` / `LLM_BACKOFF_BASE` / `LLM_BACKOFF_MAX` | Retry khi lỗi kết nối / 429 / 5xx (số lần, giây) | `3` / `2` / `30` |
-| `KB_PATH`         | Đường dẫn knowledge base                             | `knowledge_base.json`         |
-| `CORS_ORIGINS`    | Origin được phép gọi API, cách nhau bởi dấu phẩy     | `*`                           |
+| Biến                                                       | Ý nghĩa                                                      | Mặc định trong code                                      |
+| ---------------------------------------------------------- | ------------------------------------------------------------ | -------------------------------------------------------- |
+| `OCR_ENDPOINT`                                             | URL OCR API (`.../v1/ocr/documents`)                         | — (bắt buộc khi OCR file PDF)                            |
+| `OCR_TIMEOUT`                                              | Thời gian chờ OCR tối đa (giây)                              | `900`                                                    |
+| `OPENAI_BASE_URL`                                          | Base URL của server LLM tương thích OpenAI                   | `http://localhost:8000/v1`                               |
+| `MODEL_NAME`                                               | Tên model trên server (compose: cũng là alias của llama.cpp) | `google/gemma-4-26B-A4B-it`, `.env.example`: `local-llm` |
+| `OPENAI_API_KEY`                                           | API key (để trống nếu server không yêu cầu)                  | `EMPTY`                                                  |
+| `LLM_TEMPERATURE`                                          | Temperature khi gọi LLM                                      | `0`                                                      |
+| `LLM_MAX_RETRIES` / `LLM_BACKOFF_BASE` / `LLM_BACKOFF_MAX` | Retry khi lỗi kết nối / 429 / 5xx (số lần, giây)             | `3` / `2` / `30`                                         |
+| `KB_PATH`                                                  | Đường dẫn knowledge base                                     | `knowledge_base.json`                                    |
+| `CORS_ORIGINS`                                             | Origin được phép gọi API, cách nhau bởi dấu phẩy             | `*`                                                      |
 
 Server LLM có thể là bất kỳ endpoint nào hỗ trợ `/chat/completions` theo chuẩn OpenAI
 (llama.cpp, vLLM, SGLang, Ollama, ...).
 
 **Bảng 2 — biến của `docker compose`** (self-host):
 
-| Biến                   | Ý nghĩa                                               | Mặc định                   |
-|------------------------|-------------------------------------------------------|----------------------------|
-| `LLM_MODELS_DIR`       | Thư mục lưu model GGUF (LLM + PaddleOCR-VL)           | `./models`                 |
-| `OCR_MODELS_DIR`       | Thư mục lưu model layout của PaddleOCR                | `./models/paddlex`         |
-| `LLM_HF_REPO` / `LLM_HF_FILE` | Model LLM trên Hugging Face                    | `unsloth/Qwen3.5-9B-GGUF` / `Qwen3.5-9B-Q4_K_M.gguf` |
-| `LLM_CTX_SIZE`         | Context của LLM (token)                               | `32768`                    |
-| `LLM_REASONING_BUDGET` | Giới hạn token suy nghĩ (-1 không giới hạn, 0 tắt)    | `8192`                     |
-| `OCR_VL_THREADS`       | Số luồng CPU cho VLM nhận dạng chữ                    | `8`                        |
-| `API_PORT`             | Cổng host của API                                     | `8080`                     |
+| Biến                          | Ý nghĩa                                            | Mặc định                                             |
+| ----------------------------- | -------------------------------------------------- | ---------------------------------------------------- |
+| `LLM_MODELS_DIR`              | Thư mục lưu model GGUF (LLM + PaddleOCR-VL)        | `./models`                                           |
+| `OCR_MODELS_DIR`              | Thư mục lưu model layout của PaddleOCR             | `./models/paddlex`                                   |
+| `LLM_HF_REPO` / `LLM_HF_FILE` | Model LLM trên Hugging Face                        | `unsloth/Qwen3.5-9B-GGUF` / `Qwen3.5-9B-Q4_K_M.gguf` |
+| `LLM_CTX_SIZE`                | Context của LLM (token)                            | `32768`                                              |
+| `LLM_REASONING_BUDGET`        | Giới hạn token suy nghĩ (-1 không giới hạn, 0 tắt) | `8192`                                               |
+| `OCR_VL_THREADS`              | Số luồng CPU cho VLM nhận dạng chữ                 | `8`                                                  |
+| `API_PORT`                    | Cổng host của API                                  | `8080`                                               |
 
 Ví dụ `.env` cho server / workspace có ổ riêng cho đồ nặng (vd `~/scratch` trên workspace Coder) —
 để model ở đó cho khỏi đầy quota home:
@@ -135,11 +135,11 @@ python pdf_pipeline.py file.pdf --model <tên-model>
 
 Với file đầu vào `<tên>.pdf`, pipeline ghi vào thư mục `results/`:
 
-| File                  | Nội dung                                                  |
-|-----------------------|-----------------------------------------------------------|
-| `<tên>_ocr.json`      | JSON trả về từ OCR API (chỉ tạo khi gọi OCR)              |
-| `<tên>_text.txt`      | Văn bản đã trích xuất, dùng làm đầu vào cho LLM           |
-| `<tên>_giaoviec.md`   | Bảng giao việc Markdown                                   |
+| File                | Nội dung                                        |
+| ------------------- | ----------------------------------------------- |
+| `<tên>_ocr.json`    | JSON trả về từ OCR API (chỉ tạo khi gọi OCR)    |
+| `<tên>_text.txt`    | Văn bản đã trích xuất, dùng làm đầu vào cho LLM |
+| `<tên>_giaoviec.md` | Bảng giao việc Markdown                         |
 
 Kết quả cũng được in ra terminal khi chạy xong.
 
@@ -167,10 +167,10 @@ Swagger UI: `http://<host>:8080/docs`
 
 ### Endpoint
 
-| Method | Path | Input | Output |
-|---|---|---|---|
-| `GET` | `/health` | — | `{"status": "ok", "model": "<tên model LLM>"}` |
-| `POST` | `/v1/tasks` | multipart `file` (PDF hoặc `.docx`) | `list[Task]` |
+| Method | Path        | Input                               | Output                                         |
+| ------ | ----------- | ----------------------------------- | ---------------------------------------------- |
+| `GET`  | `/health`   | —                                   | `{"status": "ok", "model": "<tên model LLM>"}` |
+| `POST` | `/v1/tasks` | multipart `file` (PDF hoặc `.docx`) | `list[Task]`                                   |
 
 `/health` chỉ cho biết API đang chạy, không kiểm tra OCR / LLM phía sau.
 
@@ -178,11 +178,11 @@ Swagger UI: `http://<host>:8080/docs`
 
 Đầu vào: `multipart/form-data`, trường `file`.
 
-| Định dạng | Cách lấy nội dung |
-|---|---|
-| `.pdf` | Gửi sang dịch vụ OCR (`OCR_ENDPOINT`), hỗ trợ PDF scan |
-| `.docx` | Đọc trực tiếp đoạn văn + bảng, không qua OCR (nhanh hơn) |
-| `.doc` | Không hỗ trợ — lưu lại thành `.docx` |
+| Định dạng | Cách lấy nội dung                                        |
+| --------- | -------------------------------------------------------- |
+| `.pdf`    | Gửi sang dịch vụ OCR (`OCR_ENDPOINT`), hỗ trợ PDF scan   |
+| `.docx`   | Đọc trực tiếp đoạn văn + bảng, không qua OCR (nhanh hơn) |
+| `.doc`    | Không hỗ trợ — lưu lại thành `.docx`                     |
 
 ```bash
 curl -m 1200 -F "file=@Thông-báo-192-TB-VPCP.pdf" http://localhost:8080/v1/tasks
@@ -190,14 +190,14 @@ curl -m 1200 -F "file=@Thông-báo-192-TB-VPCP.pdf" http://localhost:8080/v1/tas
 
 Đầu ra: mảng JSON, mỗi phần tử là một `Task`:
 
-| Trường | Kiểu | Ý nghĩa |
-|---|---|---|
-| `task_name` | string | Tên ngắn gọn của nhiệm vụ (động từ + đối tượng) |
-| `requirement` | string | Yêu cầu cần hoàn thành: làm gì, về vấn đề gì, sản phẩm đầu ra; bám sát câu chữ văn bản |
-| `executing_unit` | string \| null | Đơn vị thực hiện / chủ trì — đúng 1 đơn vị; `null` nếu không xác định được |
-| `coordinating_units` | string[] | Các đơn vị phối hợp; `[]` nếu không có |
-| `deadline` | string \| null | Thời hạn, giữ nguyên cách ghi trong văn bản; `null` nếu văn bản không nêu |
-| `reference` | string \| null | Vị trí trong văn bản (mục, khoản) |
+| Trường               | Kiểu           | Ý nghĩa                                                                                |
+| -------------------- | -------------- | -------------------------------------------------------------------------------------- |
+| `task_name`          | string         | Tên ngắn gọn của nhiệm vụ (động từ + đối tượng)                                        |
+| `requirement`        | string         | Yêu cầu cần hoàn thành: làm gì, về vấn đề gì, sản phẩm đầu ra; bám sát câu chữ văn bản |
+| `executing_unit`     | string \| null | Đơn vị thực hiện / chủ trì — đúng 1 đơn vị; `null` nếu không xác định được             |
+| `coordinating_units` | string[]       | Các đơn vị phối hợp; `[]` nếu không có                                                 |
+| `deadline`           | string \| null | Thời hạn, giữ nguyên cách ghi trong văn bản; `null` nếu văn bản không nêu              |
+| `reference`          | string \| null | Vị trí trong văn bản (mục, khoản)                                                      |
 
 ```json
 [
@@ -222,19 +222,19 @@ Quy tắc bóc tách:
 
 Mã lỗi (body dạng `{"detail": "..."}`):
 
-| Mã | Khi nào | Ví dụ `detail` |
-|---|---|---|
-| `400` | File rỗng, `.docx` hỏng, hoặc không trích xuất được nội dung | `File rỗng.` |
-| `415` | Không phải `.pdf` / `.docx` | `Chỉ hỗ trợ file PDF hoặc Word (.docx).` |
-| `422` | Thiếu trường `file` | — |
-| `502` | Lỗi từ dịch vụ OCR hoặc LLM phía sau | `Không đọc được JSON từ LLM: ...` |
+| Mã    | Khi nào                                                      | Ví dụ `detail`                           |
+| ----- | ------------------------------------------------------------ | ---------------------------------------- |
+| `400` | File rỗng, `.docx` hỏng, hoặc không trích xuất được nội dung | `File rỗng.`                             |
+| `415` | Không phải `.pdf` / `.docx`                                  | `Chỉ hỗ trợ file PDF hoặc Word (.docx).` |
+| `422` | Thiếu trường `file`                                          | —                                        |
+| `502` | Lỗi từ dịch vụ OCR hoặc LLM phía sau                         | `Không đọc được JSON từ LLM: ...`        |
 
 Thời gian xử lý: request chạy **đồng bộ**, trả kết quả khi xong.
 
-| Đầu vào (văn bản 8 trang) | Thời gian tham khảo |
-|---|---|
-| `.docx` | ~1.5–3 phút (chỉ LLM) |
-| PDF | ~3–8 phút (OCR self-host chạy CPU + LLM) |
+| Đầu vào (văn bản 8 trang) | Thời gian tham khảo                      |
+| ------------------------- | ---------------------------------------- |
+| `.docx`                   | ~1.5–3 phút (chỉ LLM)                    |
+| PDF                       | ~3–8 phút (OCR self-host chạy CPU + LLM) |
 
 LLM xử lý 1 request mỗi lần, request đến sau phải xếp hàng → đặt timeout ở client / reverse proxy đủ lớn
 (khuyến nghị ≥ 15 phút).
@@ -246,17 +246,17 @@ gán nhầm vai trò phối hợp, hoặc tên đơn vị chưa chuẩn hóa.
 
 Dịch vụ OCR self-host, dùng nội bộ trong `docker compose` (không publish cổng ra ngoài):
 
-| Method | Path | Input | Output |
-|---|---|---|---|
-| `GET` | `/health` | — | `{"status": "ok" \| "loading", "vl_server": ...}` |
-| `POST` | `/v1/ocr/documents` | multipart `file` (PDF hoặc ảnh png/jpg/bmp/tif) | JSON, trường `content` là văn bản Markdown |
+| Method | Path                | Input                                           | Output                                            |
+| ------ | ------------------- | ----------------------------------------------- | ------------------------------------------------- |
+| `GET`  | `/health`           | —                                               | `{"status": "ok" \| "loading", "vl_server": ...}` |
+| `POST` | `/v1/ocr/documents` | multipart `file` (PDF hoặc ảnh png/jpg/bmp/tif) | JSON, trường `content` là văn bản Markdown        |
 
 ```json
 {
   "schema_version": "1.0.0",
-  "document": {"filename": "a.pdf", "page_count": 8},
+  "document": { "filename": "a.pdf", "page_count": 8 },
   "content": "THÔNG BÁO\n\nKết luận của Thủ tướng Chính phủ ...",
-  "processing": {"ocr_engine": "paddleocr-vl-1.6", "duration_ms": 315535}
+  "processing": { "ocr_engine": "paddleocr-vl-1.6", "duration_ms": 315535 }
 }
 ```
 
@@ -274,12 +274,12 @@ PDF / .docx ──►  │ summarizer :8080 ──► ocr (layout, CPU) ──�
                  └────────────────────────────────────────────────────────────────────────┘
 ```
 
-| Service | Container | Vai trò | Chạy trên |
-|---|---|---|---|
-| `summarizer` | `meeting-summarizer` | API `/v1/tasks` (cổng `API_PORT`, mặc định 8080) | CPU |
-| `llm` | `noteai-llm` | LLM trích xuất nhiệm vụ | GPU |
-| `ocr` | `noteai-ocr` | Phân tích layout PaddleOCR, API `/v1/ocr/documents` | CPU |
-| `ocr-vl` | `noteai-ocr-vl` | VLM nhận dạng chữ PaddleOCR-VL-1.6 | CPU |
+| Service      | Container            | Vai trò                                             | Chạy trên |
+| ------------ | -------------------- | --------------------------------------------------- | --------- |
+| `summarizer` | `meeting-summarizer` | API `/v1/tasks` (cổng `API_PORT`, mặc định 8080)    | CPU       |
+| `llm`        | `noteai-llm`         | LLM trích xuất nhiệm vụ                             | GPU       |
+| `ocr`        | `noteai-ocr`         | Phân tích layout PaddleOCR, API `/v1/ocr/documents` | CPU       |
+| `ocr-vl`     | `noteai-ocr-vl`      | VLM nhận dạng chữ PaddleOCR-VL-1.6                  | CPU       |
 
 Yêu cầu: GPU NVIDIA ≥ 8GB VRAM + `nvidia-container-toolkit`, RAM trống ≥ 8GB (OCR ~3.5GB).
 
@@ -308,16 +308,11 @@ nên không đòi hỏi nhiều RAM.
 
 Chọn model qua `LLM_HF_REPO` / `LLM_HF_FILE` trong `.env`:
 
-| Model | `LLM_HF_REPO` / `LLM_HF_FILE` | Weight | Ghi chú |
-|---|---|---|---|
-| Qwen3.5-9B Q4_K_M (mặc định) | `unsloth/Qwen3.5-9B-GGUF` / `Qwen3.5-9B-Q4_K_M.gguf` | 5.7GB | Vừa 8GB thoải mái với context 32k |
-| Gemma-4-12B QAT Q4_0 | `google/gemma-4-12B-it-qat-q4_0-gguf` / `gemma-4-12b-it-qat-q4_0.gguf` | 7.0GB | Cùng họ với model gốc nên prompt hợp hơn, nhưng rất sát 8GB — có thể phải giảm `LLM_CTX_SIZE` |
-| Gemma-4-E4B QAT Q4_0 | `google/gemma-4-E4B-it-qat-q4_0-gguf` / `gemma-4-E4B_q4_0-it.gguf` | 5.2GB | Nhẹ, nhưng khả năng suy luận đơn vị yếu hơn |
-
-Bị lỗi hết VRAM (OOM) thì giảm `LLM_CTX_SIZE` (vd `24576`) hoặc chọn model nhỏ hơn.
-
-Qwen3.5 "suy nghĩ" trước khi trả lời; nếu không giới hạn có thể dùng hết context 32k trước khi kịp trả lời
-(API trả `502 Không đọc được JSON từ LLM`). `LLM_REASONING_BUDGET` (mặc định `8192`) giới hạn số token suy nghĩ.
+| Model                        | `LLM_HF_REPO` / `LLM_HF_FILE`                                          | Weight | Ghi chú                                                                                       |
+| ---------------------------- | ---------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------- |
+| Qwen3.5-9B Q4_K_M (mặc định) | `unsloth/Qwen3.5-9B-GGUF` / `Qwen3.5-9B-Q4_K_M.gguf`                   | 5.7GB  | Vừa 8GB thoải mái với context 32k                                                             |
+| Gemma-4-12B QAT Q4_0         | `google/gemma-4-12B-it-qat-q4_0-gguf` / `gemma-4-12b-it-qat-q4_0.gguf` | 7.0GB  | Cùng họ với model gốc nên prompt hợp hơn, nhưng rất sát 8GB — có thể phải giảm `LLM_CTX_SIZE` |
+| Gemma-4-E4B QAT Q4_0         | `google/gemma-4-E4B-it-qat-q4_0-gguf` / `gemma-4-E4B_q4_0-it.gguf`     | 5.2GB  | Nhẹ, nhưng khả năng suy luận đơn vị yếu hơn                                                   |
 
 ### OCR self-host (PaddleOCR-VL-1.6)
 
@@ -338,10 +333,10 @@ giống 99.2% theo ký tự, đủ 23 khoản, giữ đúng tên các Bộ/UBND;
 
 Đo trên PDF 8 trang:
 
-| VLM chạy trên | 8 trang | VRAM |
-|---|---|---|
-| CPU 8 luồng (mặc định) | ~291s | 0 |
-| GPU (image `server-cuda` + reservation GPU, `-ngl 99`) | ~69s | ~2.8GB — chỉ dùng khi GPU ≥ 10GB |
+| VLM chạy trên                                          | 8 trang | VRAM                             |
+| ------------------------------------------------------ | ------- | -------------------------------- |
+| CPU 8 luồng (mặc định)                                 | ~291s   | 0                                |
+| GPU (image `server-cuda` + reservation GPU, `-ngl 99`) | ~69s    | ~2.8GB — chỉ dùng khi GPU ≥ 10GB |
 
 ### Vận hành & kiểm tra
 
@@ -375,16 +370,6 @@ docker compose down                           # model trong LLM_MODELS_DIR / OCR
 ```
 
 Mở Swagger UI của server từ máy cá nhân: `ssh -L 8080:localhost:8080 <server>` rồi vào `http://localhost:8080/docs`.
-
-## Dùng như thư viện
-
-```python
-from pdf_pipeline import process_pdf
-
-result = process_pdf("file.pdf")
-print(result["assignments"])        # nội dung giao việc
-print(result["assignments_path"])   # đường dẫn file .md
-```
 
 ## Ghi chú
 
