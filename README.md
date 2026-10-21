@@ -52,23 +52,31 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Sau đó điền các biến trong `.env`:
+Sau đó chỉnh `.env`. Có 2 cách chạy, dùng các biến khác nhau:
 
-| Biến              | Ý nghĩa                                              | Mặc định                      |
+| Cách chạy | OCR / LLM lấy ở đâu | Biến cần quan tâm |
+|---|---|---|
+| **`docker compose`** (self-host, khuyến nghị) | Container `ocr` / `llm` trong cùng compose — compose tự đặt `OCR_ENDPOINT` / `OPENAI_BASE_URL` | Bảng 2 (thư mục model, model LLM, context...) |
+| **Chạy trực tiếp** (`pdf_pipeline.py`, `uvicorn app:app`) | Dịch vụ bất kỳ có URL truy cập được | Bảng 1, đặc biệt `OCR_ENDPOINT` / `OPENAI_BASE_URL` |
+
+**Bảng 1 — biến của app** (đọc trong `utils/`, `app.py`):
+
+| Biến              | Ý nghĩa                                              | Mặc định trong code           |
 |-------------------|------------------------------------------------------|-------------------------------|
 | `OCR_ENDPOINT`    | URL OCR API (`.../v1/ocr/documents`)                 | — (bắt buộc khi OCR file PDF) |
 | `OCR_TIMEOUT`     | Thời gian chờ OCR tối đa (giây)                      | `900`                         |
 | `OPENAI_BASE_URL` | Base URL của server LLM tương thích OpenAI           | `http://localhost:8000/v1`    |
-| `MODEL_NAME`      | Tên model trên server                                | `google/gemma-4-26B-A4B-it`   |
+| `MODEL_NAME`      | Tên model trên server (compose: cũng là alias của llama.cpp) | `google/gemma-4-26B-A4B-it`, `.env.example`: `local-llm` |
 | `OPENAI_API_KEY`  | API key (để trống nếu server không yêu cầu)          | `EMPTY`                       |
 | `LLM_TEMPERATURE` | Temperature khi gọi LLM                              | `0`                           |
+| `LLM_MAX_RETRIES` / `LLM_BACKOFF_BASE` / `LLM_BACKOFF_MAX` | Retry khi lỗi kết nối / 429 / 5xx (số lần, giây) | `3` / `2` / `30` |
 | `KB_PATH`         | Đường dẫn knowledge base                             | `knowledge_base.json`         |
+| `CORS_ORIGINS`    | Origin được phép gọi API, cách nhau bởi dấu phẩy     | `*`                           |
 
 Server LLM có thể là bất kỳ endpoint nào hỗ trợ `/chat/completions` theo chuẩn OpenAI
-(vLLM, SGLang, Ollama, ...).
+(llama.cpp, vLLM, SGLang, Ollama, ...).
 
-Khi chạy bằng `docker compose`, `OCR_ENDPOINT` / `OPENAI_BASE_URL` được tự trỏ tới các container self-host;
-các biến riêng cho compose:
+**Bảng 2 — biến của `docker compose`** (self-host):
 
 | Biến                   | Ý nghĩa                                               | Mặc định                   |
 |------------------------|-------------------------------------------------------|----------------------------|
@@ -80,9 +88,32 @@ các biến riêng cho compose:
 | `OCR_VL_THREADS`       | Số luồng CPU cho VLM nhận dạng chữ                    | `8`                        |
 | `API_PORT`             | Cổng host của API                                     | `8080`                     |
 
+Ví dụ `.env` cho server / workspace có ổ riêng cho đồ nặng (vd `~/scratch` trên workspace Coder) —
+để model ở đó cho khỏi đầy quota home:
+
+```bash
+OCR_TIMEOUT=900
+MODEL_NAME=local-llm
+LLM_TEMPERATURE=0
+
+LLM_MODELS_DIR=/home/jovyan/scratch/<user>/models
+OCR_MODELS_DIR=/home/jovyan/scratch/<user>/paddlex
+
+LLM_CTX_SIZE=32768
+LLM_REASONING_BUDGET=8192
+OCR_VL_THREADS=8
+API_PORT=8080
+```
+
+`.env` nằm trong `.gitignore` — không commit file này (có thể chứa API key).
+
 ## Sử dụng
 
-Trích xuất giao việc từ một file PDF (gọi OCR API rồi LLM):
+CLI `pdf_pipeline.py` gọi thẳng `OCR_ENDPOINT` và `OPENAI_BASE_URL` trong `.env`, nên cần 2 dịch vụ này
+truy cập được từ máy chạy lệnh. Stack `docker compose` **không mở cổng** `ocr` / `llm` ra host — khi dùng
+compose, gọi qua API (`POST /v1/tasks`), hoặc dùng `--ocr-json` để bỏ qua OCR.
+
+Trích xuất giao việc từ một file PDF (gọi OCR rồi LLM):
 
 ```bash
 python pdf_pipeline.py "Thông-báo-192-TB-VPCP.pdf"
