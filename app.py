@@ -16,7 +16,52 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-app = FastAPI(title="Trích xuất nhiệm vụ", version="1.0.0")
+API_DESCRIPTION = """
+Đọc văn bản hành chính (PDF scan hoặc Word) và trích xuất **danh sách nhiệm vụ được giao**:
+đơn vị nào thực hiện, đơn vị nào phối hợp, yêu cầu gì, thời hạn nào, căn cứ ở đâu trong văn bản.
+
+## Luồng xử lý
+
+```
+PDF  ──► OCR ──┐
+               ├──► văn bản ──► LLM + knowledge base ──► list[Task]
+.docx ─────────┘   (đọc trực tiếp, không qua OCR)
+```
+
+- **OCR**: dịch vụ cấu hình qua `OCR_ENDPOINT` (self-host: PaddleOCR-VL-1.6).
+- **LLM**: endpoint OpenAI-compatible cấu hình qua `OPENAI_BASE_URL` (self-host: llama.cpp).
+- **Knowledge base** (`knowledge_base.json`): phạm vi phụ trách của các cơ quan, dùng để suy luận
+  đích danh đơn vị khi văn bản chỉ nêu chung chung ("các cơ quan liên quan"...).
+
+## Thời gian xử lý
+
+Một request được xử lý **đồng bộ** (trả kết quả khi xong), thường mất vài phút:
+
+| Đầu vào | Thời gian tham khảo (văn bản 8 trang) |
+|---|---|
+| `.docx` | ~1.5–3 phút (chỉ LLM) |
+| PDF | ~3–8 phút (OCR + LLM) |
+
+LLM xử lý **1 request mỗi lần**, request đến sau phải xếp hàng → client / reverse proxy cần đặt
+timeout đủ lớn (khuyến nghị ≥ 15 phút).
+
+## Lưu ý về kết quả
+
+Kết quả do LLM sinh ra, nên được **người rà soát lại** trước khi sử dụng chính thức:
+có thể sót nhiệm vụ, gán nhầm vai trò phối hợp, hoặc ghi tên đơn vị chưa chuẩn hóa.
+"""
+
+TAGS_METADATA = [
+    {"name": "Nhiệm vụ", "description": "Trích xuất nhiệm vụ từ văn bản hành chính."},
+    {"name": "Hệ thống", "description": "Kiểm tra trạng thái dịch vụ."},
+]
+
+app = FastAPI(
+    title="Trích xuất nhiệm vụ",
+    version="1.0.0",
+    description=API_DESCRIPTION,
+    openapi_tags=TAGS_METADATA,
+)
 
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]
 app.add_middleware(
@@ -29,12 +74,52 @@ app.add_middleware(
 
 
 class Task(BaseModel):
-    task_name: str = Field(description="Tên nhiệm vụ")
-    requirement: str = Field(description="Yêu cầu cần hoàn thành")
-    executing_unit: str | None = Field(description="Đơn vị thực hiện (mỗi nhiệm vụ đúng 1 đơn vị)")
-    coordinating_units: list[str] = Field(description="Các đơn vị phối hợp")
-    deadline: str | None = Field(description="Thời gian cần hoàn thành; null nếu văn bản không nêu")
-    reference: str | None = Field(description="Vị trí trong văn bản")
+    """Một nhiệm vụ được giao trong văn bản."""
+
+    task_name: str = Field(
+        description="Tên ngắn gọn của nhiệm vụ (động từ + đối tượng)",
+        examples=["Thẩm định hồ sơ điều chỉnh cục bộ quy hoạch chung xây dựng"],
+    )
+    requirement: str = Field(
+        description="Yêu cầu cần hoàn thành: làm gì, về vấn đề gì, sản phẩm đầu ra; bám sát câu chữ văn bản",
+        examples=["Tổ chức thẩm định hồ sơ điều chỉnh cục bộ quy hoạch chung xây dựng Thành phố Hồ Chí Minh, "
+                  "trình Thủ tướng Chính phủ xem xét, quyết định."],
+    )
+    executing_unit: str | None = Field(
+        description="Đơn vị thực hiện / chủ trì. Mỗi nhiệm vụ đúng 1 đơn vị (văn bản giao cho nhiều đơn vị "
+                    "cùng thực hiện thì tách thành nhiều nhiệm vụ); null nếu không xác định được",
+        examples=["Bộ Xây dựng"],
+    )
+    coordinating_units: list[str] = Field(
+        description="Các đơn vị phối hợp; [] nếu không có. Cụm chung chung (\"các cơ quan liên quan\"...) "
+                    "được suy luận thành đơn vị cụ thể qua knowledge base, không suy luận được thì bị bỏ",
+        examples=[["Ủy ban nhân dân Thành phố Hồ Chí Minh"]],
+    )
+    deadline: str | None = Field(
+        description="Thời hạn, giữ nguyên cách ghi trong văn bản; null nếu văn bản không nêu",
+        examples=["Trong thời gian 10 ngày làm việc sau khi nhận được Hồ sơ"],
+    )
+    reference: str | None = Field(
+        description="Vị trí trong văn bản (mục, khoản)",
+        examples=["Mục III, khoản 10"],
+    )
+
+
+class Health(BaseModel):
+    status: str = Field(description="`ok` khi dịch vụ sẵn sàng", examples=["ok"])
+    model: str = Field(description="Tên model LLM đang dùng", examples=["local-llm"])
+
+
+class ErrorResponse(BaseModel):
+    detail: str = Field(description="Mô tả lỗi")
+
+
+def _error(description: str, example: str) -> dict:
+    return {
+        "model": ErrorResponse,
+        "description": description,
+        "content": {"application/json": {"example": {"detail": example}}},
+    }
 
 
 class TextRequest(BaseModel):
@@ -49,37 +134,54 @@ def _run(fn, *args, **kwargs):
         raise HTTPException(status_code=502, detail=str(e)) from e
 
 
-@app.get("/health")
+@app.get(
+    "/health",
+    response_model=Health,
+    tags=["Hệ thống"],
+    summary="Kiểm tra trạng thái",
+    description="Trả `status: ok` khi API đang chạy. Không kiểm tra OCR / LLM phía sau.",
+)
 def health():
     return {"status": "ok", "model": MODEL}
 
 
-@app.post("/v1/tasks", response_model=list[Task])
-async def tasks_from_document(file: UploadFile = File(..., description="File văn bản PDF hoặc Word (.docx)")):
+@app.post(
+    "/v1/tasks",
+    response_model=list[Task],
+    tags=["Nhiệm vụ"],
+    summary="Trích xuất nhiệm vụ từ file văn bản",
+    responses={
+        400: _error("File rỗng, file .docx hỏng, hoặc không trích xuất được nội dung", "File rỗng."),
+        415: _error("Định dạng không hỗ trợ (chỉ nhận .pdf, .docx)", "Chỉ hỗ trợ file PDF hoặc Word (.docx)."),
+        502: _error("Lỗi từ dịch vụ OCR hoặc LLM phía sau", "Không đọc được JSON từ LLM: ..."),
+    },
+)
+async def tasks_from_document(file: UploadFile = File(..., description="File văn bản PDF (kể cả bản scan) hoặc Word (.docx)")):
     """
-    Upload văn bản → lấy text → trích xuất danh sách nhiệm vụ.
+    Upload một văn bản hành chính, trả về **mảng nhiệm vụ** (`list[Task]`).
 
-    - PDF: gửi qua OCR API.
-    - Word (.docx): đọc text trực tiếp (đoạn văn + bảng), không qua OCR.
+    **Đầu vào** — `multipart/form-data`, trường `file`:
 
-    **Input:** multipart/form-data, trường `file` là file PDF hoặc .docx văn bản hành chính.
+    | Định dạng | Cách lấy nội dung |
+    |---|---|
+    | `.pdf` | Gửi sang dịch vụ OCR (hỗ trợ PDF scan) |
+    | `.docx` | Đọc trực tiếp đoạn văn + bảng, không qua OCR (nhanh hơn) |
+    | `.doc` | Không hỗ trợ — lưu lại thành `.docx` |
 
-    **Output:** mảng JSON, mỗi phần tử là một nhiệm vụ:
+    **Quy tắc bóc tách**
 
-    - `task_name` (string): tên ngắn gọn của nhiệm vụ (động từ + đối tượng),
-      vd "Thẩm định hồ sơ điều chỉnh cục bộ quy hoạch chung".
-    - `requirement` (string): yêu cầu cần hoàn thành — làm gì, về vấn đề gì, cho đối tượng nào,
-      sản phẩm/kết quả đầu ra; bám sát câu chữ văn bản.
-    - `executing_unit` (string | null): đơn vị thực hiện/chủ trì. Mỗi nhiệm vụ có đúng 1 đơn vị;
-      null nếu văn bản không xác định được.
-    - `coordinating_units` (string[]): các đơn vị phối hợp; [] nếu không có.
-      Khi văn bản nêu chung chung ("các cơ quan liên quan"...), đơn vị được suy luận từ knowledge base.
-    - `deadline` (string | null): thời gian cần hoàn thành, giữ nguyên cách ghi trong văn bản
-      (vd "Trong tháng 6 năm 2020"); null nếu văn bản không nêu.
-    - `reference` (string | null): vị trí trong văn bản, vd "Mục III, khoản 10".
+    - A thực hiện, B phối hợp → **1 nhiệm vụ**: `executing_unit = A`, `coordinating_units = [B]`.
+    - A và B cùng thực hiện → **2 nhiệm vụ**, mỗi đơn vị một nhiệm vụ.
+    - Cụm chung chung ("các cơ quan liên quan", "các Bộ, ngành"...) được suy luận thành đơn vị cụ thể
+      qua knowledge base; không suy luận được thì bị bỏ khỏi danh sách.
 
-    **Lỗi:** 415 không phải PDF/.docx, 400 file rỗng / file hỏng / không có nội dung,
-    502 lỗi OCR API / LLM (xem `detail`).
+    **Ví dụ**
+
+    ```bash
+    curl -m 1200 -F "file=@Thông-báo-192-TB-VPCP.pdf" http://localhost:8080/v1/tasks
+    ```
+
+    Request xử lý đồng bộ, mất vài phút (PDF 8 trang: ~3–8 phút) — đặt timeout phía client ≥ 15 phút.
     """
     filename = (file.filename or "").lower()
     if filename.endswith(".doc"):
