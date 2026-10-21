@@ -3,8 +3,11 @@
 Pipeline đọc văn bản hành chính dạng PDF và xác định **đích danh đơn vị nào phải làm nhiệm vụ gì**:
 
 ```
-PDF ──► OCR API ──► văn bản thô ──► LLM + knowledge base ──► giao việc .md
+PDF ──► OCR ──► văn bản thô ──► LLM + knowledge base ──► giao việc .md / JSON
 ```
+
+OCR và LLM đều có thể self-host bằng `docker compose` trên máy có GPU 8GB VRAM
+(OCR: PaddleOCR-VL-1.6 chạy CPU; LLM: Qwen3.5-9B trên llama.cpp chạy GPU) — xem [Docker compose](#docker-compose-self-host).
 
 Kết quả gồm:
 
@@ -63,6 +66,19 @@ Sau đó điền các biến trong `.env`:
 
 Server LLM có thể là bất kỳ endpoint nào hỗ trợ `/chat/completions` theo chuẩn OpenAI
 (vLLM, SGLang, Ollama, ...).
+
+Khi chạy bằng `docker compose`, `OCR_ENDPOINT` / `OPENAI_BASE_URL` được tự trỏ tới các container self-host;
+các biến riêng cho compose:
+
+| Biến                   | Ý nghĩa                                               | Mặc định                   |
+|------------------------|-------------------------------------------------------|----------------------------|
+| `LLM_MODELS_DIR`       | Thư mục lưu model GGUF (LLM + PaddleOCR-VL)           | `./models`                 |
+| `OCR_MODELS_DIR`       | Thư mục lưu model layout của PaddleOCR                | `./models/paddlex`         |
+| `LLM_HF_REPO` / `LLM_HF_FILE` | Model LLM trên Hugging Face                    | `unsloth/Qwen3.5-9B-GGUF` / `Qwen3.5-9B-Q4_K_M.gguf` |
+| `LLM_CTX_SIZE`         | Context của LLM (token)                               | `32768`                    |
+| `LLM_REASONING_BUDGET` | Giới hạn token suy nghĩ (-1 không giới hạn, 0 tắt)    | `8192`                     |
+| `OCR_VL_THREADS`       | Số luồng CPU cho VLM nhận dạng chữ                    | `8`                        |
+| `API_PORT`             | Cổng host của API                                     | `8080`                     |
 
 ## Sử dụng
 
@@ -124,13 +140,43 @@ pip install -r requirements.txt
 uvicorn app:app --host 0.0.0.0 --port 8080
 ```
 
-Hoặc Docker, gồm cả LLM và OCR self-host (xem các mục dưới):
+Hoặc Docker, gồm cả LLM và OCR self-host (xem mục [Docker compose](#docker-compose-self-host)).
 
-```bash
-docker compose up -d
+Swagger UI: `http://<host>:8080/docs`
+
+## Docker compose (self-host)
+
+```
+                 ┌──────────────────────────── docker compose ────────────────────────────┐
+PDF / .docx ──►  │ summarizer :8080 ──► ocr (layout, CPU) ──► ocr-vl (PaddleOCR-VL, CPU)   │
+                 │        │                                                               │
+                 │        └──────────► llm (Qwen3.5-9B, llama.cpp, GPU ~6.3GB)            │
+                 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-### LLM self-host (GPU 8GB VRAM)
+| Service | Container | Vai trò | Chạy trên |
+|---|---|---|---|
+| `summarizer` | `meeting-summarizer` | API `/v1/tasks` (cổng `API_PORT`, mặc định 8080) | CPU |
+| `llm` | `noteai-llm` | LLM trích xuất nhiệm vụ | GPU |
+| `ocr` | `noteai-ocr` | Phân tích layout PaddleOCR, API `/v1/ocr/documents` | CPU |
+| `ocr-vl` | `noteai-ocr-vl` | VLM nhận dạng chữ PaddleOCR-VL-1.6 | CPU |
+
+Yêu cầu: GPU NVIDIA ≥ 8GB VRAM + `nvidia-container-toolkit`, RAM trống ≥ 8GB (OCR ~3.5GB).
+
+```bash
+cp .env.example .env
+# Đặt thư mục lưu model (nên để ở ổ dành cho đồ nặng, vd ~/scratch trên workspace Coder):
+#   LLM_MODELS_DIR=/path/to/scratch/models
+#   OCR_MODELS_DIR=/path/to/scratch/paddlex
+docker compose up -d --build
+```
+
+Lần đầu tự tải model (~7.5GB: Qwen3.5-9B 5.7GB + PaddleOCR-VL 1.8GB + model layout); các lần sau dùng lại
+từ `LLM_MODELS_DIR` / `OCR_MODELS_DIR`. `summarizer` chỉ khởi động sau khi `llm` và `ocr` healthy.
+
+Thời gian trên `Thông-báo-192-TB-VPCP.pdf` (8 trang): OCR ~5 phút (CPU 8 luồng) + LLM ~2.5–3 phút.
+
+### LLM self-host
 
 `docker-compose.yml` chạy kèm container `llm`: **llama.cpp server**, toàn bộ model nằm trên GPU
 nên không đòi hỏi nhiều RAM.
@@ -149,6 +195,9 @@ Chọn model qua `LLM_HF_REPO` / `LLM_HF_FILE` trong `.env`:
 | Gemma-4-E4B QAT Q4_0 | `google/gemma-4-E4B-it-qat-q4_0-gguf` / `gemma-4-E4B_q4_0-it.gguf` | 5.2GB | Nhẹ, nhưng khả năng suy luận đơn vị yếu hơn |
 
 Bị lỗi hết VRAM (OOM) thì giảm `LLM_CTX_SIZE` (vd `24576`) hoặc chọn model nhỏ hơn.
+
+Qwen3.5 "suy nghĩ" trước khi trả lời; nếu không giới hạn có thể dùng hết context 32k trước khi kịp trả lời
+(API trả `502 Không đọc được JSON từ LLM`). `LLM_REASONING_BUDGET` (mặc định `8192`) giới hạn số token suy nghĩ.
 
 ### OCR self-host (PaddleOCR-VL-1.6)
 
@@ -174,7 +223,38 @@ giống 99.2% theo ký tự, đủ 23 khoản, giữ đúng tên các Bộ/UBND;
 | CPU 8 luồng (mặc định) | ~291s | 0 |
 | GPU (image `server-cuda` + reservation GPU, `-ngl 99`) | ~69s | ~2.8GB — chỉ dùng khi GPU ≥ 10GB |
 
-Swagger UI: `http://<host>:8080/docs`
+### Vận hành & kiểm tra
+
+Nếu Docker daemon không ở socket mặc định (vd server dùng chung `/run/docker-sock/docker.sock`):
+`export DOCKER_HOST=unix:///run/docker-sock/docker.sock`.
+
+```bash
+# Trạng thái: cả 4 container Up, 3 container noteai-* (healthy)
+docker compose ps
+docker inspect -f '{{.Name}} restarts={{.RestartCount}} oom={{.State.OOMKilled}}' \
+  noteai-llm noteai-ocr-vl noteai-ocr meeting-summarizer
+curl -s localhost:8080/health                 # {"status":"ok","model":"local-llm"}
+
+# Log
+docker compose logs -f --tail 50
+docker logs -f meeting-summarizer             # request vào API, lỗi 4xx/5xx
+docker logs noteai-llm 2>&1 | grep "eval time"   # tốc độ mỗi lần gọi LLM
+docker logs noteai-ocr 2>&1 | grep POST       # các lần gọi OCR
+
+# Tài nguyên
+nvidia-smi                                    # noteai-llm ~6.3GB VRAM
+docker stats --no-stream                      # CPU / RAM từng container
+
+# Test thật
+time curl -s -m 1700 -F "file=@Thông-báo-192-TB-VPCP.pdf" localhost:8080/v1/tasks | python3 -m json.tool | head -40
+
+# Cập nhật / khởi động lại / dừng
+git pull && docker compose up -d --build
+docker compose restart ocr-vl
+docker compose down                           # model trong LLM_MODELS_DIR / OCR_MODELS_DIR vẫn giữ nguyên
+```
+
+Mở Swagger UI của server từ máy cá nhân: `ssh -L 8080:localhost:8080 <server>` rồi vào `http://localhost:8080/docs`.
 
 ### Endpoint
 
@@ -201,7 +281,8 @@ curl -F "file=@Thông-báo-192-TB-VPCP.pdf" http://localhost:8080/v1/tasks
 ```
 
 Mã lỗi: `415` không phải PDF, `400` file rỗng, `502` lỗi OCR API / LLM (kèm `detail`).
-Một request PDF gồm OCR (~85s cho 7 trang) + LLM nên cần đặt timeout ở reverse proxy/client đủ lớn (vd ≥ 15 phút).
+Một request PDF gồm OCR (~5 phút cho 8 trang khi OCR self-host chạy CPU) + LLM (~3 phút) nên cần đặt timeout
+ở reverse proxy/client đủ lớn (vd ≥ 15 phút). LLM xử lý 1 request mỗi lần, request đến sau phải xếp hàng.
 
 ## Dùng như thư viện
 
@@ -215,7 +296,7 @@ print(result["assignments_path"])   # đường dẫn file .md
 
 ## Ghi chú
 
-- OCR một PDF khoảng 7 trang mất ~85 giây; với văn bản dài hãy tăng `OCR_TIMEOUT`.
+- OCR một PDF 8 trang mất ~5 phút với OCR self-host chạy CPU; với văn bản dài hãy tăng `OCR_TIMEOUT` (mặc định 900s).
 - Văn bản trích từ OCR có thể còn lỗi chính tả nhỏ — prompt đã lưu ý model về điều này.
 - Muốn thay đổi cách trích xuất, sửa `EXTRACT_PROMPT` / `RESOLVE_PROMPT` trong `utils/assignments.py`.
 - Chất lượng nhiệm vụ gián tiếp phụ thuộc vào độ phủ của `knowledge_base.json`: cơ quan không có trong KB sẽ không được gợi ý.
