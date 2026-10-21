@@ -366,7 +366,7 @@ nvidia-smi                                    # noteai-llm ~6.3GB VRAM
 docker stats --no-stream                      # CPU / RAM từng container
 
 # Test thật
-time curl -s -m 1700 -F "file=@Thông-báo-192-TB-VPCP.pdf" localhost:8080/v1/tasks | python3 -m json.tool | head -40
+time curl -s -m 1700 -F "file=@Thông-báo-192-TB-VPCP.pdf" localhost:8080/v1/tasks | python3 -m json.tool --no-ensure-ascii | head -40
 
 # Cập nhật / khởi động lại / dừng
 git pull && docker compose up -d --build
