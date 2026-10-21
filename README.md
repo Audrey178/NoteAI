@@ -164,13 +164,15 @@ Model OCR dòng chữ truyền thống của PaddleOCR (PP-OCRv5 latin / PP-OCRv
 Chất lượng trên `Thông-báo-192-TB-VPCP.pdf` (8 trang), so với OCR API cũ (Surya + sửa chính tả bằng Gemma 26B):
 giống 99.2% theo ký tự, đủ 23 khoản, giữ đúng tên các Bộ/UBND; lỗi còn lại chủ yếu là sai dấu lẻ tẻ ("Phố" thay "Phó").
 
-Chế độ chạy VLM (`OCR_VL_GPU_LAYERS` / `OCR_VL_MMPROJ_OFFLOAD` trong `.env`), đo khi LLM đã chiếm ~6.3GB VRAM:
+**OCR chạy CPU, GPU dành cho LLM**: LLM đã chiếm ~6.3GB, thêm VLM trên GPU (~2.8GB) sẽ vượt 8GB.
+`ocr-vl` dùng image llama.cpp bản CPU, không xin GPU. Số luồng: `OCR_VL_THREADS` (mặc định 8).
 
-| Chế độ | `OCR_VL_GPU_LAYERS` / `OCR_VL_MMPROJ_OFFLOAD` | 8 trang | VRAM thêm |
-|---|---|---|---|
-| Toàn CPU (mặc định) | `0` / `0` | ~291s | 0 |
-| Encoder ảnh trên GPU | `0` / `1` | ~126s | ~1.9GB (tổng ~8.1GB, sát trần 8GB) |
-| Toàn GPU | `99` / `1` | ~69s | ~2.8GB (cần GPU ≥ 10GB) |
+Đo trên PDF 8 trang:
+
+| VLM chạy trên | 8 trang | VRAM |
+|---|---|---|
+| CPU 8 luồng (mặc định) | ~291s | 0 |
+| GPU (image `server-cuda` + reservation GPU, `-ngl 99`) | ~69s | ~2.8GB — chỉ dùng khi GPU ≥ 10GB |
 
 Swagger UI: `http://<host>:8080/docs`
 

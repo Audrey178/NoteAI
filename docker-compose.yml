@@ -54,9 +54,12 @@ services:
       start_period: 20m                # lần đầu phải tải weight (~6GB)
     restart: unless-stopped
 
-  # VLM nhận dạng chữ cho OCR: PaddleOCR-VL-1.6 (0.9B) trên llama.cpp, dùng chung GPU với llm.
+  # VLM nhận dạng chữ cho OCR: PaddleOCR-VL-1.6 (0.9B) trên llama.cpp bản CPU,
+  # để dành trọn GPU 8GB cho llm (llm ~6.3GB + VLM trên GPU ~2.8GB sẽ vượt 8GB).
+  # Đo trên PDF 8 trang: CPU 8 luồng ~291s; nếu GPU còn >= 3GB trống có thể đổi sang image server-cuda
+  # + thêm reservation GPU như service llm (~69s).
   ocr-vl:
-    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    image: ghcr.io/ggml-org/llama.cpp:server
     container_name: noteai-ocr-vl
     command:
       - --hf-repo
@@ -68,27 +71,15 @@ services:
       - --temp
       - "0"
       - --ctx-size
-      - "16384"                        # mặc định 131k x 4 slot tốn ~4.7GB VRAM; mỗi vùng ảnh chỉ cần vài nghìn token
+      - "16384"                        # mặc định 131k x 4 slot rất tốn bộ nhớ; mỗi vùng ảnh chỉ cần vài nghìn token
       - --parallel
       - "2"
+      - --threads
+      - ${OCR_VL_THREADS:-8}
     environment:
-      # Đo trên PDF 8 trang (LLM chiếm sẵn ~6.3GB VRAM):
-      #   GPU_LAYERS=0,  MMPROJ_OFFLOAD=0 -> 291s, 0GB VRAM      (mặc định, chắc chắn vừa GPU 8GB)
-      #   GPU_LAYERS=0,  MMPROJ_OFFLOAD=1 -> 126s, ~1.9GB VRAM   (tổng ~8.1GB, sát trần)
-      #   GPU_LAYERS=99, MMPROJ_OFFLOAD=1 ->  69s, ~2.8GB VRAM   (cần GPU >= 10GB)
-      LLAMA_ARG_N_GPU_LAYERS: ${OCR_VL_GPU_LAYERS:-0}
-      LLAMA_ARG_MMPROJ_OFFLOAD: ${OCR_VL_MMPROJ_OFFLOAD:-0}
-      LLAMA_ARG_THREADS: ${OCR_VL_THREADS:-8}
       LLAMA_CACHE: /models
     volumes:
       - ${LLM_MODELS_DIR:-./models}:/models
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
     healthcheck:
       test: ["CMD", "curl", "-fs", "http://localhost:8000/health"]
       interval: 30s
