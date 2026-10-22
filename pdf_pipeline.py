@@ -15,6 +15,7 @@ import os
 from utils.assignments import extract_assignments
 from utils.llm import MODEL
 from utils.ocr_client import extract_text, load_ocr_json, ocr_document
+from utils.pdf_text import read_pdf_text_layer
 
 RESULTS_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results")
 
@@ -26,6 +27,8 @@ def process_pdf(pdf_path: str | None = None, ocr_json: str | None = None,
     if ocr_json:
         print(f"[1/2] Đọc kết quả OCR từ {ocr_json}...")
         ocr_result = load_ocr_json(ocr_json)
+    elif (ocr_result := read_pdf_text_layer(pdf_path)) is not None:
+        print(f"[1/2] Đọc lớp text có sẵn của {pdf_path} (bỏ qua OCR)...")
     else:
         print(f"[1/2] Đang OCR {pdf_path}...")
         ocr_result = ocr_document(pdf_path)

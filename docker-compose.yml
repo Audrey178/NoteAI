@@ -1,7 +1,10 @@
 services:
   llm:
-    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    image: ghcr.io/ggml-org/llama.cpp:server # bản CPU
     container_name: noteai-llm
+    # i7-12700H: CPU 0-11 là 6 nhân P (có HT), 12-19 là 8 nhân E.
+    # LLM ở nhân P, OCR ở nhân E -> request đồng thời không tranh CPU của nhau.
+    cpuset: ${LLM_CPUSET:-0-11}
     command:
       - --hf-repo
       - ${LLM_HF_REPO:-unsloth/Qwen3.5-9B-GGUF}
@@ -15,8 +18,14 @@ services:
       - --port
       - "8000"
       - --jinja # dùng chat template của model; phần "thinking" tách ra reasoning_content
-      - --n-gpu-layers
-      - "999"
+      # Decode trên CPU bị giới hạn bởi băng thông RAM: = số nhân P, thêm nhân E/HT thường chậm hơn
+      - --threads
+      - ${LLM_THREADS:-6}
+      # Máy 15GB không đủ giữ LLM (~8GB) và OCR cùng lúc. Pipeline chạy OCR rồi mới LLM, nên khi rảnh
+      # thì nhả model ra cho OCR dùng RAM, có request thì nạp lại (~vài giây). Không dùng mlock: khóa
+      # weight trong RAM làm OCR bị thrash (đọc lại weight từ đĩa mỗi token, ~1 tok/s).
+      - --sleep-idle-seconds
+      - ${LLM_SLEEP_IDLE_SECONDS:-60}
       - --ctx-size
       - ${LLM_CTX_SIZE:-32768} # văn bản ~10k token + KB ~5k + prompt + output
       - --flash-attn
@@ -26,23 +35,16 @@ services:
       - --cache-type-v
       - q8_0
       - --parallel
-      - "1" # 8GB chỉ đủ KV cache cho 1 request, các request khác xếp hàng
-      # Giới hạn token "suy nghĩ" (Qwen3.5): không giới hạn thì có thể ăn hết context 32k
-      # trước khi kịp trả lời -> content rỗng. -1 = không giới hạn, 0 = tắt suy nghĩ.
+      - "1" # CPU chỉ đủ sức cho 1 request, các request khác xếp hàng
+      # Giới hạn token "suy nghĩ" (Qwen3.5). Trên CPU ~5-10 tok/s nên 8192 token suy nghĩ = 15-25 phút.
+      # -1 = không giới hạn, 0 = tắt suy nghĩ.
       - --reasoning-budget
-      - ${LLM_REASONING_BUDGET:-8192}
+      - ${LLM_REASONING_BUDGET:-1024}
     environment:
       LLAMA_CACHE: /models # không đặt thì llama.cpp tải vào ~/.cache/huggingface trong container (mất khi tạo lại)
     volumes:
       # Thư mục chứa file GGUF trên host (vd ~/scratch/models trên workspace Coder) — tải 1 lần, dùng lại
       - ${LLM_MODELS_DIR:-./models}:/models
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
     healthcheck:
       test: ["CMD", "curl", "-fs", "http://localhost:8000/health"]
       interval: 30s
@@ -53,6 +55,7 @@ services:
   ocr-vl:
     image: ghcr.io/ggml-org/llama.cpp:server
     container_name: noteai-ocr-vl
+    cpuset: ${OCR_CPUSET:-12-19}
     command:
       - --hf-repo
       - PaddlePaddle/PaddleOCR-VL-1.6-GGUF
@@ -86,6 +89,7 @@ services:
     build: ./ocr_service
     image: noteai-ocr:latest
     container_name: noteai-ocr
+    cpuset: ${OCR_CPUSET:-12-19}
     environment:
       OCR_VL_SERVER_URL: http://ocr-vl:8000/v1
     volumes:

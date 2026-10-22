@@ -4,3 +4,4 @@ fastapi
 uvicorn[standard]
 python-multipart
 python-docx
+pymupdf==1.26.7

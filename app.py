@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from utils.docx_reader import extract_docx_text
 from utils.llm import MODEL
 from utils.ocr_client import extract_text, ocr_document
+from utils.pdf_text import read_pdf_text_layer
 from utils.tasks import extract_tasks
 from dotenv import load_dotenv
 
@@ -85,7 +86,10 @@ async def tasks_from_document(file: UploadFile = File(..., description="File vă
             path = os.path.join(tmp, os.path.basename(file.filename))
             with open(path, "wb") as f:
                 f.write(content)
-            ocr_result = await run_in_threadpool(_run, ocr_document, path)
+            # PDF có sẵn lớp text thì không cần OCR
+            ocr_result = await run_in_threadpool(read_pdf_text_layer, path)
+            if ocr_result is None:
+                ocr_result = await run_in_threadpool(_run, ocr_document, path)
         text = extract_text(ocr_result)
 
     if not text:

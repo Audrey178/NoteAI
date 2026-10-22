@@ -14,6 +14,7 @@ BASE_URL = os.getenv("OPENAI_BASE_URL", "http://localhost:8000/v1")
 MODEL = os.getenv("MODEL_NAME", "google/gemma-4-26B-A4B-it")
 API_KEY = os.getenv("OPENAI_API_KEY", "EMPTY")
 TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0"))
+TIMEOUT = int(os.getenv("LLM_TIMEOUT", "1800"))  # LLM chạy CPU: 1 lượt có thể mất 10-20 phút
 
 # Retry cho lỗi tạm thời (connection reset by peer, 429, 5xx của gateway...).
 MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "3"))
@@ -64,7 +65,7 @@ def _post_with_retry(url: str, payload: dict, headers: dict, timeout: int) -> re
     raise AssertionError("unreachable")
 
 
-def query_llm(prompt: str, model: str = MODEL, timeout: int = 600,
+def query_llm(prompt: str, model: str = MODEL, timeout: int = TIMEOUT,
               temperature: float = TEMPERATURE) -> str:
     """
     Gửi 1 prompt tới endpoint OpenAI-compatible (/chat/completions) và lấy kết quả.
