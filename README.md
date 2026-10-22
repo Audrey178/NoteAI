@@ -318,6 +318,9 @@ Thời gian trên `192.pdf` (8 trang, bản scan, i7-12700H, 15GB RAM): tổng *
   OCR xong mới gọi LLM, nên LLM rảnh thì nhả RAM cho OCR, có request thì nạp lại (~10 giây). Không bật mlock: khóa weight
   LLM trong RAM làm OCR thrash (đọc lại weight từ đĩa, ~1 token/s thay vì 20–40). Không dùng `--cache-reuse`: Qwen3.5 là kiến trúc
   hybrid nên llama.cpp tự tắt nó (`cache_reuse is not supported by this context`).
+- `--spec-type ngram-simple`: đoán trước token từ n-gram trong prompt (JSON đầu ra chép nguyên văn văn bản), sinh
+  nhanh hơn ~30% (7.2 → 9.2 tok/s), không tốn RAM. Đã thử và bỏ: `ngram-mod` (+21%), `draft-mtp` (GGUF không có lớp MTP),
+  `--parallel 4` (tổng tok/s chỉ +20%), `--threads-batch 12` (prefill không nhanh hơn).
 - `LLM_REASONING_BUDGET` mặc định `1024`: trên CPU ~5–10 token/s nên 8192 token suy nghĩ có thể mất 15–25 phút.
 - Lần chạy đầu tự tải weight về `LLM_MODELS_DIR` (mặc định `./models`), các lần sau dùng lại;
   `summarizer` chờ `llm` healthy mới khởi động.

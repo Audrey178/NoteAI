@@ -35,7 +35,11 @@ services:
       - --cache-type-v
       - q8_0
       - --parallel
-      - "1" # CPU chỉ đủ sức cho 1 request, các request khác xếp hàng
+      - "1" # CPU chỉ đủ sức cho 1 request: đo với 4 slot tổng tok/s chỉ tăng ~20%
+      # Đoán trước token bằng n-gram trong prompt: JSON đầu ra chép nguyên văn từ văn bản nên
+      # sinh nhanh hơn ~30% (đo 7.2 -> 9.2 tok/s), không tốn thêm RAM. Qwen3.5 GGUF không có lớp MTP.
+      - --spec-type
+      - ngram-simple
       # Giới hạn token "suy nghĩ" (Qwen3.5). Trên CPU ~5-10 tok/s nên 8192 token suy nghĩ = 15-25 phút.
       # -1 = không giới hạn, 0 = tắt suy nghĩ.
       - --reasoning-budget
