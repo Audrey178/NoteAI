@@ -14,7 +14,7 @@ BASE_URL = os.getenv("OPENAI_BASE_URL", "http://localhost:8000/v1")
 MODEL = os.getenv("MODEL_NAME", "google/gemma-4-26B-A4B-it")
 API_KEY = os.getenv("OPENAI_API_KEY", "EMPTY")
 TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0"))
-TIMEOUT = int(os.getenv("LLM_TIMEOUT", "1800"))  # LLM chạy CPU: 1 lượt có thể mất 10-20 phút
+TIMEOUT = int(os.getenv("LLM_TIMEOUT", "3600"))  # LLM chạy CPU: file 192.pdf mất ~29 phút/lượt
 
 # Retry cho lỗi tạm thời (connection reset by peer, 429, 5xx của gateway...).
 MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "3"))

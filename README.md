@@ -70,7 +70,7 @@ Sau đó chỉnh `.env`. Có 2 cách chạy, dùng các biến khác nhau:
 | `MODEL_NAME`                                               | Tên model trên server (compose: cũng là alias của llama.cpp) | `google/gemma-4-26B-A4B-it`, `.env.example`: `local-llm` |
 | `OPENAI_API_KEY`                                           | API key (để trống nếu server không yêu cầu)                  | `EMPTY`                                                  |
 | `LLM_TEMPERATURE`                                          | Temperature khi gọi LLM                                      | `0`                                                      |
-| `LLM_TIMEOUT`                                              | Thời gian chờ mỗi lượt gọi LLM tối đa (giây)                 | `1800`                                                   |
+| `LLM_TIMEOUT`                                              | Thời gian chờ mỗi lượt gọi LLM tối đa (giây)                 | `3600`                                                   |
 | `LLM_MAX_RETRIES` / `LLM_BACKOFF_BASE` / `LLM_BACKOFF_MAX` | Retry khi lỗi kết nối / 429 / 5xx (số lần, giây)             | `3` / `2` / `30`                                         |
 | `KB_PATH`                                                  | Đường dẫn knowledge base                                     | `knowledge_base.json`                                    |
 | `CORS_ORIGINS`                                             | Origin được phép gọi API, cách nhau bởi dấu phẩy             | `*`                                                      |
@@ -303,8 +303,10 @@ docker compose up -d --build
 Lần đầu tự tải model (~7.5GB: Qwen3.5-9B 5.7GB + PaddleOCR-VL 1.8GB + model layout); các lần sau dùng lại
 từ `LLM_MODELS_DIR` / `OCR_MODELS_DIR`. `summarizer` chỉ khởi động sau khi `llm` và `ocr` healthy.
 
-Thời gian trên `192.pdf` (8 trang, bản scan): OCR ~5 phút (CPU 8 luồng); LLM chạy CPU chưa đo lại
-(bản GPU trước đây ~2.5–3 phút).
+Thời gian trên `192.pdf` (8 trang, bản scan, i7-12700H, 15GB RAM): tổng **~31 phút** (bản GPU trước đây ~2.5–3 phút)
+- OCR ~3.5 phút (8 nhân E)
+- LLM ~29 phút: nạp lại model sau khi ngủ ~12s, đọc prompt 9.9k token ~5.5 phút (~30 tok/s), sinh 7.8k token
+  ~23 phút (~5.6 tok/s). Phần lớn là JSON đầu ra (37 nhiệm vụ, ~20k ký tự), nên văn bản càng nhiều nhiệm vụ càng lâu.
 
 ### LLM self-host
 
