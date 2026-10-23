@@ -72,7 +72,9 @@ Sau đó chỉnh `.env`. Có 2 cách chạy, dùng các biến khác nhau:
 | `LLM_TEMPERATURE`                                          | Temperature khi gọi LLM                                      | `0`                                                      |
 | `LLM_TIMEOUT`                                              | Thời gian chờ tối đa giữa 2 lần nhận dữ liệu từ LLM (giây, gọi dạng stream) | `3600`                                    |
 | `LLM_MAX_RETRIES` / `LLM_BACKOFF_BASE` / `LLM_BACKOFF_MAX` | Retry khi lỗi kết nối / 429 / 5xx (số lần, giây)             | `3` / `2` / `30`                                         |
-| `MAX_CONCURRENT_JOBS`                                      | Số văn bản API xử lý đồng thời, vượt quá trả `503`           | `1`                                                      |
+| `MAX_CONCURRENT_JOBS`                                      | Số văn bản API xử lý đồng thời (nên = `--parallel` của LLM)  | `1`                                                      |
+| `MAX_QUEUED_JOBS`                                          | Số job tối đa được chờ trong hàng, vượt quá trả `503`        | `20`                                                     |
+| `JOB_TTL_SECONDS`                                          | Giữ kết quả job đã xong bao lâu (giây)                       | `86400`                                                  |
 | `KB_PATH`                                                  | Đường dẫn knowledge base                                     | `knowledge_base.json`                                    |
 | `CORS_ORIGINS`                                             | Origin được phép gọi API, cách nhau bởi dấu phẩy             | `*`                                                      |
 
@@ -135,7 +137,7 @@ Giả lập chỉ giới hạn số nhân và RAM; CPU server (Xeon, có AMX, nh
 
 CLI `pdf_pipeline.py` gọi thẳng `OCR_ENDPOINT` và `OPENAI_BASE_URL` trong `.env`, nên cần 2 dịch vụ này
 truy cập được từ máy chạy lệnh. Stack `docker compose` **không mở cổng** `ocr` / `llm` ra host — khi dùng
-compose, gọi qua API (`POST /v1/tasks`), hoặc dùng `--ocr-json` để bỏ qua OCR.
+compose, gọi qua API (`POST /v1/jobs` hoặc `POST /v1/tasks`), hoặc dùng `--ocr-json` để bỏ qua OCR.
 
 Trích xuất giao việc từ một file PDF (gọi OCR rồi LLM):
 
@@ -191,12 +193,41 @@ Swagger UI: `http://<host>:8080/docs`
 
 ### Endpoint
 
-| Method | Path        | Input                               | Output                                         |
-| ------ | ----------- | ----------------------------------- | ---------------------------------------------- |
-| `GET`  | `/health`   | —                                   | `{"status": "ok", "model": "<tên model LLM>"}` |
-| `POST` | `/v1/tasks` | multipart `file` (PDF hoặc `.docx`) | `list[Task]`                                   |
+| Method | Path                 | Input                               | Output                                                              |
+| ------ | -------------------- | ----------------------------------- | ------------------------------------------------------------------- |
+| `GET`  | `/health`            | —                                   | `{"status": "ok", "model": ..., "busy": bool, "queued_jobs": int}` |
+| `POST` | `/v1/jobs`           | multipart `file` (PDF hoặc `.docx`) | `202` + `JobStatus` (khuyến nghị)                                   |
+| `GET`  | `/v1/jobs/{job_id}`  | —                                   | `JobStatus`, có `result` khi xong                                   |
+| `POST` | `/v1/tasks`          | multipart `file` (PDF hoặc `.docx`) | `list[Task]` (đồng bộ, chờ đến khi xong)                            |
 
-`/health` chỉ cho biết API đang chạy, không kiểm tra OCR / LLM phía sau.
+`/health` chỉ cho biết API đang chạy (và hàng đợi có đang bận không), không kiểm tra OCR / LLM phía sau.
+
+### Hàng đợi job: `POST /v1/jobs`, `GET /v1/jobs/{job_id}`
+
+LLM chạy CPU mất ~30 phút/văn bản và chỉ xử lý 1 văn bản mỗi lần (`MAX_CONCURRENT_JOBS`), nên nên dùng hàng đợi:
+gửi file, nhận `job_id` ngay, rồi hỏi lại trạng thái (vd mỗi 30 giây) đến khi `status` là `done` / `failed`.
+Đầu vào và mã lỗi `415` / `400` (file rỗng) giống `POST /v1/tasks`; hàng đợi đã có `MAX_QUEUED_JOBS` job chờ thì trả `503`.
+
+```bash
+curl -s -F "file=@192.pdf" http://localhost:8080/v1/jobs
+# {"job_id": "d9cc3a43...", "status": "queued", "position": 0, ...}
+curl -s http://localhost:8080/v1/jobs/d9cc3a43...
+```
+
+`JobStatus`:
+
+| Trường                                     | Kiểu                                        | Ý nghĩa                                                                  |
+| ------------------------------------------ | ------------------------------------------- | ------------------------------------------------------------------------ |
+| `job_id`                                   | string                                      | Mã job                                                                   |
+| `status`                                   | `queued` \| `running` \| `done` \| `failed` | Trạng thái                                                               |
+| `filename`                                 | string                                      | Tên file đã gửi                                                          |
+| `position`                                 | int \| null                                 | Số job chờ phía trước (0 = chạy kế tiếp); `null` khi không còn chờ        |
+| `created_at` / `started_at` / `finished_at` | datetime (UTC) \| null                      | Thời điểm gửi / bắt đầu / xong                                           |
+| `result`                                   | `list[Task]` \| null                        | Kết quả khi `done` (giống output của `POST /v1/tasks`)                   |
+| `error`                                    | `{"status_code", "detail"}` \| null         | Khi `failed`: mã lỗi tương ứng nếu gọi đồng bộ (`400` / `502` / `500`) và lý do |
+
+Hàng đợi lưu trong RAM của API: restart container `summarizer` thì mất các job đang chờ / kết quả chưa lấy.
+Job xong được giữ `JOB_TTL_SECONDS` (mặc định 1 ngày), sau đó `GET` trả `404`.
 
 ### `POST /v1/tasks`
 
@@ -252,16 +283,16 @@ Mã lỗi (body dạng `{"detail": "..."}`):
 | `415` | Không phải `.pdf` / `.docx`                                  | `Chỉ hỗ trợ file PDF hoặc Word (.docx).` |
 | `422` | Thiếu trường `file`                                          | —                                        |
 | `502` | Lỗi từ dịch vụ OCR hoặc LLM phía sau                         | `Không đọc được JSON từ LLM: ...`        |
-| `503` | Đang xử lý văn bản khác (`MAX_CONCURRENT_JOBS`), có header `Retry-After` | `Server đang xử lý văn bản khác, hãy thử lại sau.` |
+| `503` | Đang xử lý văn bản khác (`MAX_CONCURRENT_JOBS`), có header `Retry-After` | `Server đang xử lý văn bản khác, hãy dùng POST /v1/jobs hoặc thử lại sau.` |
 
-Thời gian xử lý: request chạy **đồng bộ**, trả kết quả khi xong.
+Thời gian xử lý: `POST /v1/tasks` chạy **đồng bộ**, trả kết quả khi xong.
 
 | Đầu vào (văn bản 8 trang) | Thời gian tham khảo                      |
 | ------------------------- | ---------------------------------------- |
 | `.docx`                   | ~1.5–3 phút (chỉ LLM)                    |
 | PDF                       | ~3–8 phút (OCR self-host chạy CPU + LLM) |
 
-LLM xử lý 1 request mỗi lần nên API không xếp hàng: request đến khi đang bận nhận ngay `503`, gửi lại sau.
+`POST /v1/tasks` không xếp hàng: gửi khi đang có job chạy / chờ thì nhận ngay `503` — dùng `POST /v1/jobs` để xếp hàng.
 Đặt timeout ở client / reverse proxy đủ lớn cho 1 lượt (khuyến nghị ≥ 40 phút với LLM chạy CPU).
 
 Kết quả do LLM sinh ra nên cần **người rà soát** trước khi dùng chính thức: có thể sót nhiệm vụ,
@@ -301,7 +332,7 @@ PDF / .docx ──►  │ summarizer :8080 ──► ocr (layout, CPU) ──�
 
 | Service      | Container            | Vai trò                                             | Chạy trên |
 | ------------ | -------------------- | --------------------------------------------------- | --------- |
-| `summarizer` | `meeting-summarizer` | API `/v1/tasks` (cổng `API_PORT`, mặc định 8080)    | CPU       |
+| `summarizer` | `meeting-summarizer` | API `/v1/jobs`, `/v1/tasks` (cổng `API_PORT`, mặc định 8080)    | CPU       |
 | `llm`        | `noteai-llm`         | LLM trích xuất nhiệm vụ                             | CPU       |
 | `ocr`        | `noteai-ocr`         | Phân tích layout PaddleOCR, API `/v1/ocr/documents` | CPU       |
 | `ocr-vl`     | `noteai-ocr-vl`      | VLM nhận dạng chữ PaddleOCR-VL-1.6                  | CPU       |
