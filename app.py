@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Literal
 
-from fastapi import FastAPI, File, HTTPException, Response, UploadFile
+from fastapi import FastAPI, File, HTTPException, Query, Response, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -74,16 +74,23 @@ class JobError(BaseModel):
     detail: str
 
 
-class JobStatus(BaseModel):
+JobState = Literal["queued", "running", "done", "failed"]
+
+
+class JobSummary(BaseModel):
     job_id: str
-    status: Literal["queued", "running", "done", "failed"]
+    status: JobState
     filename: str
     position: int | None = Field(description="Số job đang chờ phía trước (0 = chạy kế tiếp); null khi không còn chờ")
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
-    result: list[Task] | None = Field(description="Danh sách nhiệm vụ khi status = done")
+    task_count: int | None = Field(description="Số nhiệm vụ khi status = done")
     error: JobError | None = Field(description="Lý do lỗi khi status = failed")
+
+
+class JobStatus(JobSummary):
+    result: list[Task] | None = Field(description="Danh sách nhiệm vụ khi status = done")
 
 
 def _run(fn, *args, **kwargs):
@@ -122,12 +129,16 @@ def _ts(t: float | None) -> datetime | None:
     return datetime.fromtimestamp(t, timezone.utc) if t else None
 
 
-def _job_status(job: Job) -> JobStatus:
-    return JobStatus(
+def _job_summary(job: Job) -> dict:
+    return dict(
         job_id=job.id, status=job.status, filename=job.filename, position=jobs.position(job),
         created_at=_ts(job.created_at), started_at=_ts(job.started_at), finished_at=_ts(job.finished_at),
-        result=job.result, error=job.error,
+        task_count=len(job.result) if job.result is not None else None, error=job.error,
     )
+
+
+def _job_status(job: Job) -> JobStatus:
+    return JobStatus(**_job_summary(job), result=job.result)
 
 
 @app.post("/v1/jobs", response_model=JobStatus, status_code=202,
@@ -140,6 +151,15 @@ async def create_job(response: Response,
     job = _submit(file.filename, await _read_upload(file))
     response.headers["Location"] = f"/v1/jobs/{job.id}"
     return _job_status(job)
+
+
+@app.get("/v1/jobs", response_model=list[JobSummary], summary="Danh sách job còn lưu, mới nhất trước")
+def list_jobs(
+    status: JobState | None = Query(None, description="Lọc theo trạng thái"),
+    limit: int = Query(50, ge=1, le=500),
+):
+    """Không kèm `result`; lấy kết quả qua `GET /v1/jobs/{job_id}`."""
+    return [JobSummary(**_job_summary(j)) for j in jobs.list(status)[:limit]]
 
 
 @app.get("/v1/jobs/{job_id}", response_model=JobStatus, summary="Trạng thái / kết quả của job")

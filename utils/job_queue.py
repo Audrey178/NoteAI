@@ -63,6 +63,11 @@ class JobQueue:
     def get(self, job_id: str) -> Job | None:
         return self._jobs.get(job_id)
 
+    def list(self, status: str | None = None) -> list[Job]:
+        """Các job còn lưu, mới nhất trước."""
+        self._prune()
+        return [j for j in reversed(self._jobs.values()) if status is None or j.status == status]
+
     def queued_count(self) -> int:
         return sum(j.status == QUEUED for j in self._jobs.values())
 

@@ -197,12 +197,13 @@ Swagger UI: `http://<host>:8080/docs`
 | ------ | -------------------- | ----------------------------------- | ------------------------------------------------------------------- |
 | `GET`  | `/health`            | —                                   | `{"status": "ok", "model": ..., "busy": bool, "queued_jobs": int}` |
 | `POST` | `/v1/jobs`           | multipart `file` (PDF hoặc `.docx`) | `202` + `JobStatus` (khuyến nghị)                                   |
+| `GET`  | `/v1/jobs`           | query `status`, `limit` (mặc định 50) | `list[JobSummary]` — mới nhất trước, không kèm `result`            |
 | `GET`  | `/v1/jobs/{job_id}`  | —                                   | `JobStatus`, có `result` khi xong                                   |
 | `POST` | `/v1/tasks`          | multipart `file` (PDF hoặc `.docx`) | `list[Task]` (đồng bộ, chờ đến khi xong)                            |
 
 `/health` chỉ cho biết API đang chạy (và hàng đợi có đang bận không), không kiểm tra OCR / LLM phía sau.
 
-### Hàng đợi job: `POST /v1/jobs`, `GET /v1/jobs/{job_id}`
+### Hàng đợi job: `POST /v1/jobs`, `GET /v1/jobs`, `GET /v1/jobs/{job_id}`
 
 LLM chạy CPU mất ~30 phút/văn bản và chỉ xử lý 1 văn bản mỗi lần (`MAX_CONCURRENT_JOBS`), nên nên dùng hàng đợi:
 gửi file, nhận `job_id` ngay, rồi hỏi lại trạng thái (vd mỗi 30 giây) đến khi `status` là `done` / `failed`.
@@ -212,6 +213,8 @@ gửi file, nhận `job_id` ngay, rồi hỏi lại trạng thái (vd mỗi 30 g
 curl -s -F "file=@192.pdf" http://localhost:8080/v1/jobs
 # {"job_id": "d9cc3a43...", "status": "queued", "position": 0, ...}
 curl -s http://localhost:8080/v1/jobs/d9cc3a43...
+# Liệt kê job (lọc theo status: queued | running | done | failed)
+curl -s "http://localhost:8080/v1/jobs?status=running&limit=20"
 ```
 
 `JobStatus`:
@@ -223,8 +226,11 @@ curl -s http://localhost:8080/v1/jobs/d9cc3a43...
 | `filename`                                 | string                                      | Tên file đã gửi                                                          |
 | `position`                                 | int \| null                                 | Số job chờ phía trước (0 = chạy kế tiếp); `null` khi không còn chờ        |
 | `created_at` / `started_at` / `finished_at` | datetime (UTC) \| null                      | Thời điểm gửi / bắt đầu / xong                                           |
+| `task_count`                               | int \| null                                 | Số nhiệm vụ khi `done`                                                   |
 | `result`                                   | `list[Task]` \| null                        | Kết quả khi `done` (giống output của `POST /v1/tasks`)                   |
 | `error`                                    | `{"status_code", "detail"}` \| null         | Khi `failed`: mã lỗi tương ứng nếu gọi đồng bộ (`400` / `502` / `500`) và lý do |
+
+`GET /v1/jobs` trả `JobSummary`: giống `JobStatus` nhưng không có `result`.
 
 Hàng đợi lưu trong RAM của API: restart container `summarizer` thì mất các job đang chờ / kết quả chưa lấy.
 Job xong được giữ `JOB_TTL_SECONDS` (mặc định 1 ngày), sau đó `GET` trả `404`.
