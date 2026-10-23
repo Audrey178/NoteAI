@@ -70,8 +70,9 @@ Sau đó chỉnh `.env`. Có 2 cách chạy, dùng các biến khác nhau:
 | `MODEL_NAME`                                               | Tên model trên server (compose: cũng là alias của llama.cpp) | `google/gemma-4-26B-A4B-it`, `.env.example`: `local-llm` |
 | `OPENAI_API_KEY`                                           | API key (để trống nếu server không yêu cầu)                  | `EMPTY`                                                  |
 | `LLM_TEMPERATURE`                                          | Temperature khi gọi LLM                                      | `0`                                                      |
-| `LLM_TIMEOUT`                                              | Thời gian chờ mỗi lượt gọi LLM tối đa (giây)                 | `3600`                                                   |
+| `LLM_TIMEOUT`                                              | Thời gian chờ tối đa giữa 2 lần nhận dữ liệu từ LLM (giây, gọi dạng stream) | `3600`                                    |
 | `LLM_MAX_RETRIES` / `LLM_BACKOFF_BASE` / `LLM_BACKOFF_MAX` | Retry khi lỗi kết nối / 429 / 5xx (số lần, giây)             | `3` / `2` / `30`                                         |
+| `MAX_CONCURRENT_JOBS`                                      | Số văn bản API xử lý đồng thời, vượt quá trả `503`           | `1`                                                      |
 | `KB_PATH`                                                  | Đường dẫn knowledge base                                     | `knowledge_base.json`                                    |
 | `CORS_ORIGINS`                                             | Origin được phép gọi API, cách nhau bởi dấu phẩy             | `*`                                                      |
 
@@ -92,6 +93,7 @@ Server LLM có thể là bất kỳ endpoint nào hỗ trợ `/chat/completions`
 | `LLM_SLEEP_IDLE_SECONDS`      | Rảnh bao lâu (giây) thì nhả model khỏi RAM (-1 tắt) | `60`                                                 |
 | `OCR_VL_THREADS`              | Số luồng CPU cho VLM nhận dạng chữ                 | `8`                                                  |
 | `OCR_CPUSET`                  | CPU dành cho `ocr` / `ocr-vl`                      | `12-19` (8 nhân E của i7-12700H)                     |
+| `LLM_MEM_LIMIT` / `OCR_VL_MEM_LIMIT` / `OCR_MEM_LIMIT` | Giới hạn RAM của `llm` / `ocr-vl` / `ocr` (vd `9g`), không dùng swap | `0` (không giới hạn) |
 | `API_PORT`                    | Cổng host của API                                  | `8080`                                               |
 
 Ví dụ `.env` cho server / workspace có ổ riêng cho đồ nặng (vd `~/scratch` trên workspace Coder) —
@@ -113,6 +115,19 @@ OCR_VL_THREADS=8
 OCR_CPUSET=12-19
 API_PORT=8080
 ```
+
+Giả lập máy thường (i7-12700H, 16GB RAM) trên server nhiều nhân dùng chung: ghim vào 6 nhân có HT + 8 nhân
+không HT trên cùng 1 NUMA node, và giới hạn RAM tổng ~16GB. Xem `lscpu -e` để lấy cặp CPU anh em (HT):
+
+```bash
+LLM_CPUSET=16-21,112-117   # 6 nhân + HT (12 CPU logic), giống 6 nhân P
+OCR_CPUSET=8-15            # 8 nhân không HT, giống 8 nhân E
+LLM_MEM_LIMIT=9g
+OCR_VL_MEM_LIMIT=4g
+OCR_MEM_LIMIT=4g
+```
+
+Giả lập chỉ giới hạn số nhân và RAM; CPU server (Xeon, có AMX, nhiều kênh RAM) vẫn nhanh hơn laptop.
 
 `.env` nằm trong `.gitignore` — không commit file này (có thể chứa API key).
 
@@ -237,6 +252,7 @@ Mã lỗi (body dạng `{"detail": "..."}`):
 | `415` | Không phải `.pdf` / `.docx`                                  | `Chỉ hỗ trợ file PDF hoặc Word (.docx).` |
 | `422` | Thiếu trường `file`                                          | —                                        |
 | `502` | Lỗi từ dịch vụ OCR hoặc LLM phía sau                         | `Không đọc được JSON từ LLM: ...`        |
+| `503` | Đang xử lý văn bản khác (`MAX_CONCURRENT_JOBS`), có header `Retry-After` | `Server đang xử lý văn bản khác, hãy thử lại sau.` |
 
 Thời gian xử lý: request chạy **đồng bộ**, trả kết quả khi xong.
 
@@ -245,8 +261,8 @@ Thời gian xử lý: request chạy **đồng bộ**, trả kết quả khi xon
 | `.docx`                   | ~1.5–3 phút (chỉ LLM)                    |
 | PDF                       | ~3–8 phút (OCR self-host chạy CPU + LLM) |
 
-LLM xử lý 1 request mỗi lần, request đến sau phải xếp hàng → đặt timeout ở client / reverse proxy đủ lớn
-(khuyến nghị ≥ 15 phút).
+LLM xử lý 1 request mỗi lần nên API không xếp hàng: request đến khi đang bận nhận ngay `503`, gửi lại sau.
+Đặt timeout ở client / reverse proxy đủ lớn cho 1 lượt (khuyến nghị ≥ 40 phút với LLM chạy CPU).
 
 Kết quả do LLM sinh ra nên cần **người rà soát** trước khi dùng chính thức: có thể sót nhiệm vụ,
 gán nhầm vai trò phối hợp, hoặc tên đơn vị chưa chuẩn hóa.

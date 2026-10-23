@@ -1,5 +1,6 @@
 
 
+import asyncio
 import os
 import tempfile
 
@@ -48,6 +49,11 @@ class TextRequest(BaseModel):
     model: str = MODEL
 
 
+# Số văn bản xử lý đồng thời; mặc định 1 vì llama.cpp chạy CPU với --parallel 1.
+# Đếm trong 1 process nên API phải chạy 1 worker uvicorn (xem Dockerfile).
+_jobs = asyncio.Semaphore(int(os.getenv("MAX_CONCURRENT_JOBS", "1")))
+
+
 def _run(fn, *args, **kwargs):
     try:
         return fn(*args, **kwargs)
@@ -75,7 +81,17 @@ async def tasks_from_document(file: UploadFile = File(..., description="File vă
     if not content:
         raise HTTPException(status_code=400, detail="File rỗng.")
 
-    if filename.endswith(".docx"):
+    # Từ chối ngay thay vì xếp hàng: request chờ sau một request khác (~30 phút trên CPU) dễ bị client hoặc
+    # proxy ngắt giữa chừng, trong khi server vẫn phải chạy hết hàng đợi.
+    if _jobs.locked():
+        raise HTTPException(status_code=503, headers={"Retry-After": "600"},
+                            detail="Server đang xử lý văn bản khác, hãy thử lại sau.")
+    async with _jobs:
+        return await _extract_tasks_from_file(file.filename, content)
+
+
+async def _extract_tasks_from_file(filename: str, content: bytes) -> list[dict]:
+    if filename.lower().endswith(".docx"):
         try:
             text = await run_in_threadpool(extract_docx_text, content)
         except ValueError as e:
@@ -83,7 +99,7 @@ async def tasks_from_document(file: UploadFile = File(..., description="File vă
     else:
         # Giữ tên file gốc khi gửi sang OCR API.
         with tempfile.TemporaryDirectory() as tmp:
-            path = os.path.join(tmp, os.path.basename(file.filename))
+            path = os.path.join(tmp, os.path.basename(filename))
             with open(path, "wb") as f:
                 f.write(content)
             # PDF có sẵn lớp text thì không cần OCR

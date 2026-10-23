@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import random
@@ -14,7 +15,10 @@ BASE_URL = os.getenv("OPENAI_BASE_URL", "http://localhost:8000/v1")
 MODEL = os.getenv("MODEL_NAME", "google/gemma-4-26B-A4B-it")
 API_KEY = os.getenv("OPENAI_API_KEY", "EMPTY")
 TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0"))
-TIMEOUT = int(os.getenv("LLM_TIMEOUT", "3600"))  # LLM chạy CPU: file 192.pdf mất ~29 phút/lượt
+# Gọi LLM dạng stream nên đây là thời gian chờ tối đa giữa 2 lần nhận dữ liệu, không phải tổng thời gian
+# (LLM chạy CPU: file 192.pdf mất ~29 phút/lượt). Lâu nhất là lúc server xử lý prompt (~5 phút / 10k token
+# trên CPU), hoặc khi request phải xếp hàng chờ request khác trên server.
+TIMEOUT = int(os.getenv("LLM_TIMEOUT", "3600"))
 
 # Retry cho lỗi tạm thời (connection reset by peer, 429, 5xx của gateway...).
 MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "3"))
@@ -47,7 +51,7 @@ def _backoff_delay(attempt: int, response: requests.Response | None = None) -> f
 def _post_with_retry(url: str, payload: dict, headers: dict, timeout: int) -> requests.Response:
     for attempt in range(MAX_RETRIES + 1):
         try:
-            response = requests.post(url, json=payload, headers=headers, timeout=timeout)
+            response = requests.post(url, json=payload, headers=headers, timeout=timeout, stream=True)
             if response.status_code in RETRYABLE_STATUS:
                 raise _RetryableHTTPError(response)
             return response
@@ -65,6 +69,23 @@ def _post_with_retry(url: str, payload: dict, headers: dict, timeout: int) -> re
     raise AssertionError("unreachable")
 
 
+def _read_stream(response: requests.Response) -> str:
+    """Ghép phần `content` từ các event SSE của /chat/completions (stream=True)."""
+    parts = []
+    for line in response.iter_lines():  # bytes: tự decode UTF-8, không dựa vào charset của header
+        if not line.startswith(b"data:"):
+            continue
+        data = line[len(b"data:"):].strip()
+        if data == b"[DONE]":
+            break
+        chunk = json.loads(data)
+        if "error" in chunk:
+            raise RuntimeError(f"LLM endpoint lỗi giữa chừng: {chunk['error']}")
+        for choice in chunk.get("choices") or []:
+            parts.append((choice.get("delta") or {}).get("content") or "")
+    return "".join(parts)
+
+
 def query_llm(prompt: str, model: str = MODEL, timeout: int = TIMEOUT,
               temperature: float = TEMPERATURE) -> str:
     """
@@ -74,7 +95,7 @@ def query_llm(prompt: str, model: str = MODEL, timeout: int = TIMEOUT,
     Args:
         prompt: nội dung prompt.
         model: tên model trên server (vd "google/gemma-4-26B-A4B-it").
-        timeout: thời gian chờ tối đa (giây) — văn bản dài cần lâu hơn.
+        timeout: thời gian chờ tối đa (giây) giữa 2 lần nhận dữ liệu từ server.
         temperature: mặc định 0 để kết quả ổn định, so sánh được giữa các lần sửa prompt.
 
     Returns:
@@ -85,6 +106,9 @@ def query_llm(prompt: str, model: str = MODEL, timeout: int = TIMEOUT,
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": temperature,
+        # Stream để kết nối luôn có dữ liệu (cả token suy nghĩ): timeout tính theo khoảng lặng thay vì
+        # tổng thời gian sinh, và server LLM biết ngay khi client ngắt để hủy request.
+        "stream": True,
     }
     headers = {"Authorization": f"Bearer {API_KEY}"}
 
@@ -102,5 +126,10 @@ def query_llm(prompt: str, model: str = MODEL, timeout: int = TIMEOUT,
     except requests.exceptions.HTTPError as e:
         raise RuntimeError(f"LLM endpoint lỗi {response.status_code}: {response.text[:500]}") from e
 
-    data = response.json()
-    return (data["choices"][0]["message"]["content"] or "").strip()
+    # requests báo hết thời gian chờ giữa 2 chunk bằng ConnectionError (bọc ReadTimeoutError)
+    try:
+        with response:
+            return _read_stream(response).strip()
+    except (requests.exceptions.ConnectionError, requests.exceptions.ChunkedEncodingError) as e:
+        raise RuntimeError(
+            f"Kết nối tới LLM bị ngắt hoặc quá {timeout}s không nhận được dữ liệu: {e}") from e

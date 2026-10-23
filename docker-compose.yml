@@ -5,6 +5,9 @@ services:
     # i7-12700H: CPU 0-11 là 6 nhân P (có HT), 12-19 là 8 nhân E.
     # LLM ở nhân P, OCR ở nhân E -> request đồng thời không tranh CPU của nhau.
     cpuset: ${LLM_CPUSET:-0-11}
+    # Giới hạn RAM (vd 8g) để server lớn chạy giống máy thật; 0 = không giới hạn. Không cho dùng swap.
+    mem_limit: ${LLM_MEM_LIMIT:-0}
+    memswap_limit: ${LLM_MEM_LIMIT:-0}
     command:
       - --hf-repo
       - ${LLM_HF_REPO:-unsloth/Qwen3.5-9B-GGUF}
@@ -60,6 +63,8 @@ services:
     image: ghcr.io/ggml-org/llama.cpp:server
     container_name: noteai-ocr-vl
     cpuset: ${OCR_CPUSET:-12-19}
+    mem_limit: ${OCR_VL_MEM_LIMIT:-0}
+    memswap_limit: ${OCR_VL_MEM_LIMIT:-0}
     command:
       - --hf-repo
       - PaddlePaddle/PaddleOCR-VL-1.6-GGUF
@@ -94,6 +99,8 @@ services:
     image: noteai-ocr:latest
     container_name: noteai-ocr
     cpuset: ${OCR_CPUSET:-12-19}
+    mem_limit: ${OCR_MEM_LIMIT:-0}
+    memswap_limit: ${OCR_MEM_LIMIT:-0}
     environment:
       OCR_VL_SERVER_URL: http://ocr-vl:8000/v1
     volumes:
