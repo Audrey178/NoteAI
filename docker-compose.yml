@@ -1,0 +1,13 @@
+services:
+  task-extractor:
+    build: .
+    image: task-extractor:latest
+    container_name: task-extractor
+    env_file: .env
+    environment:
+      OCR_ENDPOINT: http://host.docker.internal:8085/v1/ocr/documents
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8078:8080"
+    restart: unless-stopped

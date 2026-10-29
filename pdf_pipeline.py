@@ -1,7 +1,7 @@
 """
 pdf_pipeline.py
 ---------------
-Flow: PDF văn bản -> OCR API (ocr_client.py) -> tóm tắt bằng LLM (summarize.py).
+Flow: PDF văn bản -> OCR API (ocr_client.py) -> trích xuất giao việc bằng LLM + knowledge base (assignments.py).
 
 Chạy:
     python pdf_pipeline.py "Hệ thống văn phòng Điện tử VOFFICE.pdf"
@@ -12,8 +12,9 @@ import argparse
 import json
 import os
 
+from utils.assignments import extract_assignments
+from utils.llm import MODEL
 from utils.ocr_client import extract_text, load_ocr_json, ocr_document
-from utils.summarize import MODEL, summarize_document
 
 RESULTS_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results")
 
@@ -39,19 +40,19 @@ def process_pdf(pdf_path: str | None = None, ocr_json: str | None = None,
     with open(os.path.join(RESULTS_FOLDER, f"{name}_text.txt"), "w", encoding="utf-8") as f:
         f.write(text)
 
-    print(f"[2/2] Đang tóm tắt {doc.get('page_count', '?')} trang ({len(text)} ký tự) bằng {model}...")
-    summary = summarize_document(text, model=model)
+    print(f"[2/2] Đang trích xuất giao việc {doc.get('page_count', '?')} trang ({len(text)} ký tự) bằng {model}...")
+    assignments = extract_assignments(text, model=model)
 
-    summary_path = os.path.join(RESULTS_FOLDER, f"{name}_summary.md")
-    with open(summary_path, "w", encoding="utf-8") as f:
-        f.write(summary)
-    print(f"Đã lưu tóm tắt: {summary_path}")
+    assignments_path = os.path.join(RESULTS_FOLDER, f"{name}_giaoviec.md")
+    with open(assignments_path, "w", encoding="utf-8") as f:
+        f.write(assignments)
+    print(f"Đã lưu giao việc: {assignments_path}")
 
-    return {"text": text, "summary": summary, "summary_path": summary_path}
+    return {"text": text, "assignments": assignments, "assignments_path": assignments_path}
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Tóm tắt văn bản PDF qua OCR API + LLM")
+    parser = argparse.ArgumentParser(description="Trích xuất giao việc từ văn bản PDF qua OCR API + LLM")
     parser.add_argument("pdf", nargs="?", help="Đường dẫn file PDF")
     parser.add_argument("--ocr-json", help="Dùng file JSON OCR có sẵn thay vì gọi API")
     parser.add_argument("--model", default=MODEL, help="Tên model LLM")
@@ -61,4 +62,4 @@ if __name__ == "__main__":
         parser.error("Cần truyền file PDF hoặc --ocr-json.")
 
     result = process_pdf(args.pdf, args.ocr_json, args.model)
-    print("\n" + result["summary"])
+    print("\n" + result["assignments"])

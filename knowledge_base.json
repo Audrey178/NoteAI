@@ -1,0 +1,551 @@
+[
+  {
+    "authority": "Bộ Tài Chính",
+    "n": 56,
+    "keywords": [
+      "thuế",
+      "thuế giá trị gia tăng (GTGT)",
+      "thuế tiêu thụ đặc biệt",
+      "hộ kinh doanh",
+      "doanh nghiệp",
+      "đấu thầu",
+      "hóa đơn điện tử",
+      "ngân sách"
+    ],
+    "objects": [
+      "doanh nghiệp",
+      "hộ kinh doanh",
+      "nông dân (thuế nông sản)"
+    ],
+    "context": "Chính sách thuế - tài chính - ngân sách; hỗ trợ hộ kinh doanh/doanh nghiệp nhỏ, đấu thầu mua sắm công."
+  },
+  {
+    "authority": "Văn phòng Quốc hội",
+    "n": 1,
+    "keywords": [
+      "thời gian thảo luận",
+      "kỳ họp Quốc hội",
+      "dự thảo luật"
+    ],
+    "objects": [
+      "không đặc thù"
+    ],
+    "context": "Hoạt động nội bộ, tổ chức kỳ họp Quốc hội."
+  },
+  {
+    "authority": "Ban Tổ chức Trung ương",
+    "n": 35,
+    "keywords": [
+      "phụ cấp",
+      "chế độ",
+      "cán bộ Đảng",
+      "kiêm nhiệm",
+      "Mặt trận",
+      "đoàn thể chính trị - xã hội cấp xã",
+      "Quyết định …-QĐ/TW"
+    ],
+    "objects": [
+      "cán bộ",
+      "công chức khối Đảng - đoàn thể",
+      "cựu chiến binh"
+    ],
+    "context": "Chế độ/phụ cấp/kiêm nhiệm cho cán bộ khối Đảng - Mặt trận - đoàn thể cấp xã; LUÔN gắn từ Đảng/Mặt trận/đoàn thể (phân biệt với Bộ Nội vụ)."
+  },
+  {
+    "authority": "Bộ Nội Vụ",
+    "n": 136,
+    "keywords": [
+      "chế độ",
+      "phụ cấp",
+      "biên chế",
+      "tinh giản biên chế",
+      "cán bộ - công chức - viên chức",
+      "vị trí việc làm",
+      "ngạch/bậc lương",
+      "hợp đồng lao động"
+    ],
+    "objects": [
+      "cán bộ",
+      "công chức",
+      "viên chức",
+      "người lao động"
+    ],
+    "context": "Chính sách nhân sự/tổ chức bộ máy nhà nước nói chung, gắn với đợt sắp xếp - tinh gọn - sáp nhập hành chính; KHÔNG gắn từ Đảng/Mặt trận/đoàn thể (phân biệt với Ban Tổ chức Trung ương)."
+  },
+  {
+    "authority": "Ủy ban Trung ương Mặt trận Tổ quốc VN",
+    "n": 11,
+    "keywords": [
+      "Hội Cựu chiến binh",
+      "Phó Chủ tịch kiêm nhiệm",
+      "Pháp lệnh/Luật Cựu chiến binh",
+      "sáp nhập hội đoàn thể"
+    ],
+    "objects": [
+      "cán bộ",
+      "cựu chiến binh",
+      "người cao tuổi"
+    ],
+    "context": "Tổ chức và chế độ của các hội/đoàn thể thành viên Mặt trận (Cựu chiến binh, Nông dân, Phụ nữ...) - tập trung vào hoạt động của chính các hội đoàn."
+  },
+  {
+    "authority": "Bộ Ngoại giao",
+    "n": 3,
+    "keywords": [
+      "xúc tiến du lịch nước ngoài",
+      "biên giới",
+      "người nước ngoài lưu trú",
+      "phân giới cắm mốc"
+    ],
+    "objects": [
+      "người dân khu vực biên giới",
+      "người nước ngoài"
+    ],
+    "context": "Đối ngoại, hợp tác quốc tế, biên giới với nước ngoài."
+  },
+  {
+    "authority": "Tổng liên đoàn Lao động VN",
+    "n": 7,
+    "keywords": [
+      "công đoàn",
+      "cán bộ công đoàn cơ sở",
+      "nợ lương khi doanh nghiệp phá sản",
+      "sáng kiến cải tiến kỹ thuật"
+    ],
+    "objects": [
+      "người lao động",
+      "công nhân",
+      "doanh nghiệp"
+    ],
+    "context": "Bảo vệ quyền lợi người lao động qua tổ chức công đoàn trong quan hệ lao động - doanh nghiệp."
+  },
+  {
+    "authority": "Tòa án nhân dân tối cao",
+    "n": 3,
+    "keywords": [
+      "tòa án điện tử",
+      "bổ nhiệm/miễn nhiệm thẩm phán",
+      "thời hạn giải quyết vụ án",
+      "biệt phái"
+    ],
+    "objects": [
+      "công chức ngành tòa án"
+    ],
+    "context": "Hoạt động xét xử, tổ chức nhân sự ngành tòa án."
+  },
+  {
+    "authority": "Ban Nội chính Trung ương",
+    "n": 1,
+    "keywords": [
+      "phòng chống tham nhũng",
+      "lãng phí",
+      "tiêu cực"
+    ],
+    "objects": [
+      "không đặc thù (Đảng/Nhà nước nói chung)"
+    ],
+    "context": "Công tác nội chính, phòng chống tham nhũng - lãng phí - tiêu cực."
+  },
+  {
+    "authority": "Văn Phòng Chính Phủ",
+    "n": 110,
+    "keywords": [
+      "phát triển kinh tế - xã hội",
+      "hạ tầng",
+      "dự án trọng điểm",
+      "cơ chế đặc thù",
+      "chương trình mục tiêu quốc gia",
+      "đầu tư nguồn lực",
+      "đa ngành/liên ngành"
+    ],
+    "objects": [
+      "người dân",
+      "cán bộ",
+      "người lao động",
+      "doanh nghiệp"
+    ],
+    "context": "Kiến nghị vĩ mô, liên ngành, không quy về 1 Bộ cụ thể; đề nghị Chính phủ/Thủ tướng chỉ đạo tổng thể nhiều bộ ngành phối hợp."
+  },
+  {
+    "authority": "Ngân hàng Nhà nước Việt Nam",
+    "n": 4,
+    "keywords": [
+      "vay vốn",
+      "tín dụng ưu đãi",
+      "giá vàng",
+      "lãi suất",
+      "tín chấp"
+    ],
+    "objects": [
+      "người dân",
+      "nông dân"
+    ],
+    "context": "Chính sách tiền tệ - tín dụng - giá vàng."
+  },
+  {
+    "authority": "Ủy ban Kinh tế và Tài chính",
+    "n": 6,
+    "keywords": [
+      "giám sát Quốc hội",
+      "Nghị quyết Quốc hội",
+      "giá điện",
+      "dự án lưới điện",
+      "hóa đơn điện tử"
+    ],
+    "objects": [
+      "người dân",
+      "hộ kinh doanh"
+    ],
+    "context": "Đề nghị Quốc hội giám sát Chính phủ về vấn đề kinh tế - tài chính cụ thể (chủ ngữ hành động là Quốc hội, không phải Bộ)."
+  },
+  {
+    "authority": "Ngân hàng chính sách xã hội",
+    "n": 1,
+    "keywords": [
+      "vay vốn qua công đoàn",
+      "an cư lạc nghiệp",
+      "hỗ trợ mua/sửa nhà"
+    ],
+    "objects": [
+      "người lao động",
+      "đoàn viên công đoàn"
+    ],
+    "context": "Tín dụng chính sách xã hội triển khai qua kênh công đoàn/doanh nghiệp."
+  },
+  {
+    "authority": "Bộ Công thương",
+    "n": 30,
+    "keywords": [
+      "giá điện",
+      "điện sinh hoạt",
+      "xăng dầu",
+      "biểu giá bậc thang",
+      "kinh doanh xăng dầu"
+    ],
+    "objects": [
+      "doanh nghiệp",
+      "người dân"
+    ],
+    "context": "Giá điện/xăng dầu, kinh doanh xăng dầu (giấy phép), thương mại."
+  },
+  {
+    "authority": "Bộ Văn hóa Thể thao du lịch",
+    "n": 15,
+    "keywords": [
+      "du lịch",
+      "biểu diễn nghệ thuật",
+      "di tích",
+      "quảng cáo mạng xã hội",
+      "thể thao"
+    ],
+    "objects": [
+      "doanh nghiệp du lịch",
+      "văn nghệ sĩ"
+    ],
+    "context": "Quản lý văn hóa - nghệ thuật - di tích, phát triển du lịch, quảng cáo."
+  },
+  {
+    "authority": "Bộ Tư pháp",
+    "n": 17,
+    "keywords": [
+      "công chứng",
+      "thừa kế",
+      "thi hành án dân sự",
+      "hộ tịch",
+      "xác nhận tình trạng hôn nhân",
+      "văn bản quy phạm pháp luật"
+    ],
+    "objects": [
+      "người dân",
+      "trẻ em"
+    ],
+    "context": "Thủ tục tư pháp cá nhân (công chứng, hộ tịch, thừa kế, hôn nhân), thi hành án dân sự, rà soát hệ thống pháp luật nói chung (Bộ trực tiếp xử lý, không phải Quốc hội giám sát)."
+  },
+  {
+    "authority": "Ủy ban kiểm tra trung ương",
+    "n": 2,
+    "keywords": [
+      "kiểm tra Đảng",
+      "xử lý vi phạm cán bộ",
+      "ngạch Kiểm tra Đảng",
+      "UBKTTW"
+    ],
+    "objects": [
+      "cán bộ",
+      "công chức thuộc diện Trung ương quản lý"
+    ],
+    "context": "Kỷ luật Đảng, công tác kiểm tra - giám sát nội bộ Đảng."
+  },
+  {
+    "authority": "Bộ Nông nghiệp và Môi trường",
+    "n": 116,
+    "keywords": [
+      "đất đai",
+      "sử dụng đất",
+      "giấy chứng nhận quyền sử dụng đất (sổ đỏ)",
+      "quy hoạch đất",
+      "môi trường",
+      "ô nhiễm",
+      "rác thải",
+      "nông nghiệp",
+      "giá vật tư nông nghiệp",
+      "nông sản",
+      "thú y",
+      "đê điều",
+      "kè chống lũ",
+      "thiên tai",
+      "ngập úng"
+    ],
+    "objects": [
+      "người dân",
+      "nông dân",
+      "doanh nghiệp nông nghiệp"
+    ],
+    "context": "Đất đai - môi trường - nông nghiệp - phòng chống thiên tai; thường gắn địa danh cụ thể (tên sông, xã, tuyến kè, dự án cụ thể)."
+  },
+  {
+    "authority": "Ủy ban Công tác đại biểu",
+    "n": 3,
+    "keywords": [
+      "đại biểu Quốc hội/HĐND",
+      "Văn phòng Đoàn ĐBQH",
+      "bầu cử",
+      "bỏ phiếu"
+    ],
+    "objects": [
+      "đại biểu"
+    ],
+    "context": "Tổ chức, chế độ hoạt động của đại biểu dân cử (ĐBQH, HĐND)."
+  },
+  {
+    "authority": "Ủy ban Khoa học Công nghệ và Môi trường",
+    "n": 1,
+    "keywords": [
+      "thẩm tra dự án luật",
+      "khoáng sản",
+      "tính tương thích pháp luật"
+    ],
+    "objects": [
+      "không đặc thù"
+    ],
+    "context": "Quốc hội thẩm tra các dự án luật chuyên ngành (khoáng sản, KHCN, môi trường)."
+  },
+  {
+    "authority": "Bộ Khoa học và Công nghệ",
+    "n": 12,
+    "keywords": [
+      "chữ ký số",
+      "chuyển đổi số",
+      "hạ tầng số/viễn thông",
+      "đổi mới sáng tạo",
+      "sáng kiến",
+      "dữ liệu"
+    ],
+    "objects": [
+      "người dân",
+      "doanh nghiệp"
+    ],
+    "context": "Hạ tầng số/KHCN quốc gia (không gắn 'Đảng' như Văn phòng TW Đảng, không gắn 'an ninh mạng' như Bộ Công an)."
+  },
+  {
+    "authority": "Bộ Y tế",
+    "n": 89,
+    "keywords": [
+      "bảo hiểm y tế (BHYT)",
+      "khám chữa bệnh",
+      "trạm y tế xã",
+      "thuốc",
+      "bệnh viện",
+      "cơ sở y tế công lập",
+      "trợ cấp xã hội",
+      "hưu trí",
+      "sắp xếp bộ máy",
+      "sáp nhập đơn vị hành chính",
+      "chính quyền địa phương 2 cấp",
+      "tuyển dụng công chức",
+      "bảo trợ xã hội",
+      "trợ cấp hưu trí xã hội",
+      "an toàn thực phẩm",
+      "quản lý thị trường",
+      "hàng giả",
+      "hàng kém chật lượng",
+      "xác định mức độ khuyết tật",
+      "vệ sinh an toàn thực phẩm",
+      "công nhận người cao tuổi",
+      "đối tượng hưởng chính sách bảo trợ xã hội",
+      "nâng mức trợ cấp đối với người cao tuổi"
+    ],
+    "objects": [
+      "người dân",
+      "người cao tuổi",
+      "hộ nghèo",
+      "bệnh nhân",
+      "cựu chiến binh",
+      "người cao tuổi (BTXH)",
+      "người khuyết tật",
+      "người có công với cách mạng",
+      "người cao tuổi",
+      "người già",
+      "đối tượng bảo trở xã hội"
+    ],
+    "context": "Chính sách y tế - khám chữa bệnh - BHYT; tổ chức lại y tế cơ sở sau sáp nhập; chính sách cho người cao tuổi/hộ nghèo trong lĩnh vực y tế."
+  },
+  {
+    "authority": "Bộ Giáo dục và Đào tạo",
+    "n": 48,
+    "keywords": [
+      "học sinh",
+      "giáo viên",
+      "dạy thêm học thêm",
+      "sách giáo khoa",
+      "sinh viên sư phạm",
+      "môn tích hợp",
+      "trường học"
+    ],
+    "objects": [
+      "học sinh",
+      "giáo viên",
+      "sinh viên",
+      "trẻ em"
+    ],
+    "context": "Giáo dục phổ thông/đại học: chương trình học, dạy thêm-học thêm, chính sách giáo viên, sách giáo khoa."
+  },
+  {
+    "authority": "Văn phòng Trung ương Đảng",
+    "n": 3,
+    "keywords": [
+      "Sổ tay đảng viên điện tử",
+      "hệ thống thông tin nội bộ Đảng",
+      "chi bộ",
+      "điểm danh sinh hoạt đảng"
+    ],
+    "objects": [
+      "đảng viên"
+    ],
+    "context": "Chuyển đổi số trong nội bộ cơ quan Đảng (khác Bộ Khoa học và Công nghệ - hạ tầng số quốc gia nói chung)."
+  },
+  {
+    "authority": "Thanh tra Chính phủ",
+    "n": 2,
+    "keywords": [
+      "đơn thư khiếu nại",
+      "tiếp công dân",
+      "tố cáo"
+    ],
+    "objects": [
+      "cán bộ",
+      "người dân"
+    ],
+    "context": "Giải quyết khiếu nại, tố cáo, tiếp công dân."
+  },
+  {
+    "authority": "Bộ Công an",
+    "n": 35,
+    "keywords": [
+      "an ninh trật tự",
+      "vi phạm",
+      "tội phạm",
+      "lừa đảo qua mạng",
+      "cháy nổ",
+      "thường trú/tạm trú",
+      "cơ sở dữ liệu quốc gia về dân cư"
+    ],
+    "objects": [
+      "người dân",
+      "trẻ em"
+    ],
+    "context": "Quản lý cư trú/hộ khẩu, an ninh mạng, phòng cháy chữa cháy, trật tự an toàn giao thông, tội phạm."
+  },
+  {
+    "authority": "Bộ dân tộc và tôn giáo",
+    "n": 5,
+    "keywords": [
+      "đồng bào dân tộc thiểu số",
+      "miền núi",
+      "vùng sâu vùng xa",
+      "Chương trình MTQG dân tộc thiểu số",
+      "khu vực II/III"
+    ],
+    "objects": [
+      "đồng bào dân tộc",
+      "hộ nghèo"
+    ],
+    "context": "Chính sách dân tộc thiểu số - miền núi, phân định khu vực thụ hưởng chính sách."
+  },
+  {
+    "authority": "Ủy ban Pháp luật và Tư pháp",
+    "n": 5,
+    "keywords": [
+      "luật chờ hướng dẫn",
+      "hiệu lực thi hành luật",
+      "giám sát ban hành văn bản quy định chi tiết"
+    ],
+    "objects": [
+      "người dân (chung, không đặc thù)"
+    ],
+    "context": "Quốc hội giám sát chất lượng/tiến độ ban hành văn bản pháp luật nói chung (khác Bộ Tư pháp - chủ ngữ là Quốc hội giám sát chứ không trực tiếp xử lý)."
+  },
+  {
+    "authority": "Bộ Xây dựng",
+    "n": 58,
+    "keywords": [
+      "giao thông",
+      "đường/tuyến đường",
+      "quốc lộ",
+      "đường sắt tốc độ cao",
+      "dự án xây dựng",
+      "quy hoạch xây dựng",
+      "nhà ở"
+    ],
+    "objects": [
+      "người dân",
+      "doanh nghiệp",
+      "công nhân thi công"
+    ],
+    "context": "Hạ tầng giao thông - xây dựng - quy hoạch đô thị/nông thôn; thường gắn địa danh, tên dự án/tuyến đường cụ thể."
+  },
+  {
+    "authority": "Bộ Quốc phòng",
+    "n": 37,
+    "keywords": [
+      "quân nhân",
+      "nghĩa vụ quân sự",
+      "biên giới",
+      "phục viên",
+      "xuất ngũ",
+      "quốc phòng toàn dân"
+    ],
+    "objects": [
+      "quân nhân",
+      "cựu chiến binh"
+    ],
+    "context": "Chế độ chính sách quân nhân (xuất ngũ/phục viên), tuyển quân, quản lý biên giới quốc phòng."
+  },
+  {
+    "authority": "Ban Tuyên Giáo Trung ương",
+    "n": 1,
+    "keywords": [
+      "tiếp xúc đảng viên",
+      "lắng nghe góp ý",
+      "hiến kế xây dựng Đảng"
+    ],
+    "objects": [
+      "đảng viên",
+      "đại biểu"
+    ],
+    "context": "Công tác tư tưởng, tuyên truyền, dân vận của Đảng."
+  },
+  {
+    "authority": "Ủy ban Văn hóa và Xã hội",
+    "n": 2,
+    "keywords": [
+      "giám sát Luật Khám bệnh chữa bệnh",
+      "Luật Trẻ em",
+      "Luật An ninh mạng"
+    ],
+    "objects": [
+      "trẻ em"
+    ],
+    "context": "Quốc hội giám sát thực thi các luật thuộc lĩnh vực xã hội (y tế, trẻ em, an ninh mạng)."
+  }
+]
